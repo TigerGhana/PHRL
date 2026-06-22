@@ -1,0 +1,300 @@
+-- ═══════════════════════════════════════════════════════════════
+-- MedEquip Inventory — Complete Supabase Production Setup
+-- Run this ONCE in Supabase SQL Editor (Database → SQL Editor)
+-- ═══════════════════════════════════════════════════════════════
+
+
+-- ── 1. PROFILES TABLE (roles per user) ────────────────────────
+-- Every Supabase Auth user gets a profile with a role.
+-- Roles: admin | engineer | technician | viewer
+CREATE TABLE IF NOT EXISTS profiles (
+  id         UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email      TEXT        NOT NULL,
+  full_name  TEXT        DEFAULT '',
+  role       TEXT        NOT NULL DEFAULT 'viewer'
+               CHECK(role IN ('admin','engineer','technician','viewer')),
+  department TEXT        DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── SECURITY DEFINER helper (avoids circular RLS) ─────────────
+-- This function reads a user role WITHOUT triggering RLS,
+-- preventing the infinite-loop error on the profiles table.
+CREATE OR REPLACE FUNCTION get_my_role()
+RETURNS TEXT AS $$
+  SELECT role FROM profiles WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- ── Auto-create profile on new user ──────────────────────────
+-- Works for BOTH signup AND Supabase Dashboard user creation.
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, email, role)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', 'unknown@hospital.com'),
+    'viewer'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ── RLS for profiles (NO circular dependency) ─────────────────
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users see own profile"   ON profiles;
+DROP POLICY IF EXISTS "Admins see all profiles" ON profiles;
+DROP POLICY IF EXISTS "Admins update profiles"  ON profiles;
+DROP POLICY IF EXISTS "Anyone reads own profile" ON profiles;
+
+-- Each user can always read their OWN profile (no circular dependency)
+CREATE POLICY "Anyone reads own profile" ON profiles
+  FOR SELECT USING (auth.uid() = id);
+
+-- Admins can read ALL profiles (uses security definer fn — no circular loop)
+CREATE POLICY "Admins see all profiles" ON profiles
+  FOR SELECT USING (get_my_role() = 'admin');
+
+-- Only admins can update roles (uses security definer fn)
+CREATE POLICY "Admins update profiles" ON profiles
+  FOR UPDATE USING (get_my_role() = 'admin');
+
+-- The trigger (SECURITY DEFINER) handles INSERT — no INSERT policy needed for users
+-- But allow authenticated users to upsert their own profile (for safety)
+CREATE POLICY "Users upsert own profile" ON profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- ── GRANTS for profiles ───────────────────────────────────────
+GRANT SELECT ON profiles TO anon, authenticated;
+GRANT INSERT, UPDATE ON profiles TO authenticated;
+
+
+-- ── 2. SETTINGS TABLE ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT        PRIMARY KEY,
+  value      TEXT        NOT NULL,
+  updated_by UUID        REFERENCES auth.users(id),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read settings"  ON settings;
+DROP POLICY IF EXISTS "Admin write settings"  ON settings;
+DROP POLICY IF EXISTS "Admin update settings" ON settings;
+CREATE POLICY "Public read settings"   ON settings FOR SELECT USING (true);
+-- Uses get_my_role() — no circular dependency
+CREATE POLICY "Admin write settings"   ON settings FOR INSERT WITH CHECK (get_my_role()='admin');
+CREATE POLICY "Admin update settings"  ON settings FOR UPDATE USING  (get_my_role()='admin');
+
+INSERT INTO settings (key, value) VALUES
+  ('hospitalName', '"Hospital"'),
+  ('reminders',    'true'),
+  ('calThreshold', '30')
+ON CONFLICT (key) DO NOTHING;
+
+
+-- ── 3. EQUIPMENT TABLE ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS equipment (
+  id                 TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  name               TEXT        NOT NULL CHECK(length(trim(name)) >= 2),
+  category           TEXT        NOT NULL,
+  serial_number      TEXT        NOT NULL,
+  location           TEXT        NOT NULL,
+  status             TEXT        NOT NULL DEFAULT 'functional_in_use'
+                       CHECK(status IN (
+                         'functional_in_use','functional_not_in_use',
+                         'non_functional','needs_repair','obsolete'
+                       )),
+  next_maintenance   DATE        NOT NULL,
+  calibration_status TEXT        NOT NULL DEFAULT 'cal_not_required'
+                       CHECK(calibration_status IN ('cal_required','cal_not_required')),
+  last_calibration   DATE,
+  next_calibration   DATE,
+  notes                  TEXT    NOT NULL DEFAULT '',
+  maintenance_interval   TEXT    DEFAULT '90',   -- days: 30/60/90/180/365/730/0
+  calibration_interval   TEXT    DEFAULT '365',  -- days: 90/180/365/730/0
+  is_deleted             BOOLEAN NOT NULL DEFAULT FALSE,
+  last_updated           DATE    NOT NULL DEFAULT CURRENT_DATE,
+  created_by             UUID    REFERENCES auth.users(id),
+  CONSTRAINT unique_serial UNIQUE(serial_number),
+  CONSTRAINT chk_cal_dates CHECK (
+    calibration_status = 'cal_not_required'
+    OR (calibration_status = 'cal_required' AND next_calibration IS NOT NULL)
+  )
+);
+
+-- Safe column additions for upgrading existing tables
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS calibration_status      TEXT    DEFAULT 'cal_not_required';
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS last_calibration        DATE;
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS next_calibration        DATE;
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS is_deleted              BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS created_by              UUID    REFERENCES auth.users(id);
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS maintenance_interval    TEXT    DEFAULT '90';
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS calibration_interval    TEXT    DEFAULT '365';
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_equip_status       ON equipment(status)        WHERE is_deleted=FALSE;
+CREATE INDEX IF NOT EXISTS idx_equip_cal          ON equipment(calibration_status) WHERE is_deleted=FALSE;
+CREATE INDEX IF NOT EXISTS idx_equip_location     ON equipment(location)      WHERE is_deleted=FALSE;
+CREATE INDEX IF NOT EXISTS idx_equip_updated      ON equipment(last_updated DESC);
+CREATE INDEX IF NOT EXISTS idx_equip_serial       ON equipment(serial_number);
+CREATE INDEX IF NOT EXISTS idx_equip_not_deleted  ON equipment(is_deleted);
+
+-- RLS for equipment (role-based)
+ALTER TABLE equipment ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can read live equipment" ON equipment;
+DROP POLICY IF EXISTS "Engineers and admins can insert" ON equipment;
+DROP POLICY IF EXISTS "Engineers and admins can update" ON equipment;
+DROP POLICY IF EXISTS "Admins can soft-delete"         ON equipment;
+
+CREATE POLICY "Anyone can read live equipment" ON equipment
+  FOR SELECT USING (is_deleted = FALSE);
+
+-- Uses get_my_role() security definer function — no circular dependency
+CREATE POLICY "Engineers and admins can insert" ON equipment
+  FOR INSERT WITH CHECK (get_my_role() IN ('admin','engineer'));
+
+CREATE POLICY "Engineers and admins can update" ON equipment
+  FOR UPDATE USING (get_my_role() IN ('admin','engineer'));
+
+CREATE POLICY "Admins can soft-delete" ON equipment
+  FOR DELETE USING (get_my_role() = 'admin');
+
+
+-- ── 4. AUDIT LOG TABLE ────────────────────────────────────────
+-- Every create/update/delete is automatically logged.
+-- This is required for medical equipment traceability.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          BIGSERIAL   PRIMARY KEY,
+  table_name  TEXT        NOT NULL,
+  record_id   TEXT        NOT NULL,
+  action      TEXT        NOT NULL CHECK(action IN ('INSERT','UPDATE','DELETE')),
+  user_id     UUID        REFERENCES auth.users(id),
+  user_email  TEXT,
+  old_data    JSONB,
+  new_data    JSONB,
+  changed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ip_hint     TEXT        -- populated by app if available
+);
+
+-- Index for fast lookups
+CREATE INDEX IF NOT EXISTS idx_audit_record   ON audit_log(record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_user     ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_time     ON audit_log(changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_table    ON audit_log(table_name);
+
+-- Trigger function: fires on every equipment change
+CREATE OR REPLACE FUNCTION log_equipment_change()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_user_email TEXT;
+BEGIN
+  SELECT email INTO v_user_email FROM auth.users WHERE id = auth.uid();
+
+  IF (TG_OP = 'DELETE') THEN
+    INSERT INTO audit_log(table_name,record_id,action,user_id,user_email,old_data,new_data)
+    VALUES('equipment', OLD.id, 'DELETE', auth.uid(), v_user_email, to_jsonb(OLD), NULL);
+    RETURN OLD;
+  ELSIF (TG_OP = 'UPDATE') THEN
+    INSERT INTO audit_log(table_name,record_id,action,user_id,user_email,old_data,new_data)
+    VALUES('equipment', NEW.id, 'UPDATE', auth.uid(), v_user_email, to_jsonb(OLD), to_jsonb(NEW));
+    RETURN NEW;
+  ELSIF (TG_OP = 'INSERT') THEN
+    INSERT INTO audit_log(table_name,record_id,action,user_id,user_email,old_data,new_data)
+    VALUES('equipment', NEW.id, 'INSERT', auth.uid(), v_user_email, NULL, to_jsonb(NEW));
+    RETURN NEW;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS equipment_audit ON equipment;
+CREATE TRIGGER equipment_audit
+  AFTER INSERT OR UPDATE OR DELETE ON equipment
+  FOR EACH ROW EXECUTE FUNCTION log_equipment_change();
+
+-- RLS for audit_log (admin read only)
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins read audit log" ON audit_log;
+-- Uses get_my_role() — no circular dependency
+CREATE POLICY "Admins read audit log" ON audit_log FOR SELECT USING (get_my_role()='admin');
+
+
+-- ── 5. DUPLICATE SERIAL NUMBER PROTECTION ─────────────────────
+-- The UNIQUE constraint above prevents duplicates at DB level.
+-- This function lets the app check before submitting:
+CREATE OR REPLACE FUNCTION check_serial_unique(p_serial TEXT, p_exclude_id TEXT DEFAULT NULL)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN NOT EXISTS (
+    SELECT 1 FROM equipment
+    WHERE serial_number = trim(p_serial)
+      AND is_deleted = FALSE
+      AND (p_exclude_id IS NULL OR id != p_exclude_id)
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ── 6. ENSURE PROFILE FUNCTION ──────────────────────────────
+-- Called by the app on first login to guarantee a profile row exists.
+-- Handles the case where the trigger didn't fire (Dashboard user creation).
+CREATE OR REPLACE FUNCTION ensure_my_profile(p_email TEXT DEFAULT NULL)
+RETURNS TEXT AS $$
+DECLARE
+  v_email TEXT;
+  v_role  TEXT;
+BEGIN
+  -- Get email from auth if not passed
+  v_email := COALESCE(p_email, auth.jwt()->>'email', 'unknown@hospital.com');
+
+  -- Insert profile if it doesn't exist
+  INSERT INTO profiles (id, email, role)
+  VALUES (auth.uid(), v_email, 'viewer')
+  ON CONFLICT (id) DO NOTHING;
+
+  -- Return the role
+  SELECT role INTO v_role FROM profiles WHERE id = auth.uid();
+  RETURN COALESCE(v_role, 'viewer');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- ── 7. GRANT PERMISSIONS ──────────────────────────────────────
+GRANT EXECUTE ON FUNCTION get_my_role()                   TO authenticated;
+GRANT EXECUTE ON FUNCTION ensure_my_profile(TEXT)         TO authenticated;
+GRANT EXECUTE ON FUNCTION ensure_my_profile(TEXT)         TO anon;
+GRANT EXECUTE ON FUNCTION handle_new_user()               TO authenticated;
+GRANT ALL    ON equipment                                  TO authenticated;
+GRANT SELECT ON equipment                                  TO anon;
+GRANT SELECT ON settings  TO anon, authenticated;
+GRANT ALL    ON settings  TO authenticated;
+GRANT SELECT ON audit_log TO authenticated;
+GRANT USAGE, SELECT ON SEQUENCE audit_log_id_seq TO authenticated;
+
+-- ── 7. REALTIME SUBSCRIPTIONS ─────────────────────────────────
+-- Enable Realtime so changes broadcast instantly to all open tabs/devices.
+-- In Supabase: Database → Replication → enable these tables.
+-- (Also run this SQL to add them to the publication):
+ALTER PUBLICATION supabase_realtime ADD TABLE equipment;
+ALTER PUBLICATION supabase_realtime ADD TABLE settings;
+
+-- ── 8. REVOKE ANON WRITE ACCESS (defence-in-depth) ────────────
+-- Belt-and-suspenders: even if RLS has a misconfiguration,
+-- the anon role cannot write anything.
+REVOKE INSERT, UPDATE, DELETE ON equipment FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON settings  FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON profiles  FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON audit_log FROM anon;
+
+
+-- ═══════════════════════════════════════════════════════════════
+-- SETUP COMPLETE.
+-- Next steps are in the app: Settings → View Setup SQL → Step-by-Step Guide
+-- ═══════════════════════════════════════════════════════════════
