@@ -1,4 +1,1988 @@
--- ═══════════════════════════════════════════════════════════════
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta http-equiv="X-Content-Type-Options" content="nosniff"/>
+<meta http-equiv="X-Frame-Options" content="DENY"/>
+<meta http-equiv="X-XSS-Protection" content="1; mode=block"/>
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin"/>
+<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()"/>
+<title>MedEquip Inventory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3.4.1 — pinned for reproducibility -->
+<script src="https://cdn.tailwindcss.com/3.4.1"></script>
+<!-- hCaptcha — loaded dynamically by JS only when HCAPTCHA_SITE_KEY is set -->
+<!-- QR Code generation (self-contained, no CDN tracking) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+  integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSi2W0j7XlQzQ9tqIEhBkAb6Gc6/UFNbpOFw=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Chart.js v4.4.1 — verified SRI hash -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+  integrity="sha512-ZwR1/gSZM3ai6vCdI+LVF1zSq/5HznD3oD+sCoJrzXJ+yKywrokFFlT/FnAjgBkrr6ezkLHrfikvHew1xlh2w=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- SheetJS v0.18.5 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+  integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKmff+bfLE0yk9J6o2J9OE2fZO5N2MCdEjZ6bTMCXsSOqA=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- jsPDF v2.5.1 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+  integrity="sha512-qZvrmS2ekKPF2mSznTQsITDPSGMDCEMvdRb2ACqGlwJTGdNBbHKKSPfbsTzNNPFkVQnfBOBD5dSHq5AmpHUiw=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- jsPDF AutoTable v3.8.2 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"
+  integrity="sha512-hznmB6RGpSFoGGjXFgS7m+0XiCJuZ+yFhsXsp7o8XFovHMaJ8HYGhTdSGBLHDgfXHKFhBT5OAfEgD3VKpyLQQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Nunito',sans-serif;background:#8faab5;min-height:100vh;display:flex;justify-content:flex-start;overscroll-behavior:none}
+:root{
+  --teal:#1a8fa0;--teal-dk:#14717f;--teal-lt:#e6f6f8;--teal-mid:#c0e8ef;
+  --green:#22c55e;--green-lt:#dcfce7;--green-dk:#16a34a;
+  --red:#ef4444;--red-lt:#fee2e2;
+  --amber:#f59e0b;--amber-lt:#fef3c7;
+  --blue:#3b82f6;--blue-lt:#dbeafe;
+  --orange:#f97316;
+  --bg:#f0f4f6;--card:#ffffff;--text:#1e293b;--sub:#64748b;--border:#e2e8f0;
+  --shadow:0 2px 12px rgba(0,0,0,.08);--shadow-lg:0 8px 32px rgba(0,0,0,.14);
+}
+/* ── Base (mobile-first) ───────────────────────── */
+#app{width:100%;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
+#sidebar{display:none}
+#main-content{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+
+/* ── Mobile ≤599px ─────────────────────────────── */
+@media(max-width:599px){
+  body{justify-content:center}
+  #app{max-width:430px}
+}
+
+/* ── Tablet 600–899px ──────────────────────────── */
+@media(min-width:600px) and (max-width:899px){
+  body{background:#dde8ed;justify-content:center}
+  #app{max-width:680px;box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .page-hero{padding:28px 28px 24px}
+  .page-hero h1{font-size:26px}
+}
+
+/* ── Desktop ≥900px ────────────────────────────── */
+@media(min-width:900px){
+  body{background:#dde8ed;justify-content:center;align-items:flex-start}
+  #app{flex-direction:row;max-width:1320px;min-height:100vh;box-shadow:0 0 60px rgba(0,0,0,.2)}
+
+  /* Sidebar */
+  #sidebar{
+    display:flex;flex-direction:column;
+    width:230px;flex-shrink:0;
+    background:var(--teal-dk);
+    min-height:100vh;
+    padding:28px 0 20px;
+    position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+
+  /* Main content fills the rest */
+  #main-content{flex:1;min-width:0;min-height:100vh;overflow-x:hidden}
+
+  /* Bottom nav hidden on desktop */
+  .bnav{display:none!important}
+
+  /* Screen padding */
+  .screen{padding-bottom:32px!important}
+  .page-hero{padding:32px 40px 28px}
+  .page-hero h1{font-size:28px}
+
+  /* Tiles bigger */
+  .tile{padding:22px 18px 26px}
+
+  /* Full-screen slides cover only the main content area */
+  .fullscreen{
+    position:fixed;
+    top:0;bottom:0;
+    left:230px;right:0;
+    transform:none;
+    max-width:none;
+    width:auto;
+    z-index:50;
+  }
+
+  /* Modal overlay: covers main content only */
+  .overlay{
+    position:fixed;
+    top:0;bottom:0;
+    left:230px;right:0;
+    transform:none;
+    align-items:center;   /* center vertically on desktop */
+    justify-content:center;
+    z-index:100;
+  }
+
+  /* Modal box: centered, not bottom-sheet on desktop */
+  .mbox{
+    width:100%;
+    max-width:560px;
+    max-height:90vh;
+    border-radius:18px;   /* fully rounded on desktop */
+    align-self:auto;
+    margin:0;
+  }
+
+  /* Offline bar covers main area */
+  #offline-bar{
+    position:fixed;
+    top:0;
+    left:230px;right:0;
+    transform:none;
+    max-width:none;
+    width:auto;
+  }
+}
+
+/* ── Wide desktop ≥1200px ──────────────────────── */
+@media(min-width:1200px){
+  #sidebar{width:260px}
+  .fullscreen{left:260px}
+  .overlay{left:260px}
+  #offline-bar{left:260px}
+  #app{max-width:1440px}
+}
+.screen{flex:1;overflow-y:auto;padding-bottom:88px;animation:fadeUp .2s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Nav ── */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:40;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -4px 20px rgba(0,0,0,.07)}
+@media(min-width:600px) and (max-width:899px){.bnav{max-width:680px}}
+.nbtn{flex:1;background:none;border:none;padding:10px 2px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;user-select:none;position:relative}
+.nbtn .ico{font-size:19px;line-height:1;filter:grayscale(1) opacity(.35);transition:filter .15s}
+.nbtn .lbl{font-size:9.5px;font-weight:700;letter-spacing:.3px;color:var(--sub);font-family:'Nunito',sans-serif}
+.nbtn.active .ico{filter:none}
+.nbtn.active .lbl{color:var(--teal)}
+.nbtn.active::after{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:3px;background:var(--teal);border-radius:0 0 4px 4px}
+
+/* ── Cards ── */
+.card{background:var(--card);border-radius:16px;box-shadow:var(--shadow)}
+.tile{background:var(--card);border-radius:16px;padding:18px 14px 22px;box-shadow:var(--shadow);position:relative;overflow:hidden;cursor:pointer;transition:transform .12s;-webkit-user-select:none}
+.tile:active{transform:scale(.96)}
+.tile-bar{position:absolute;bottom:0;left:0;right:0;height:5px}
+.eq-card{background:var(--card);border-radius:14px;padding:15px;box-shadow:var(--shadow);cursor:pointer;border-left:4px solid var(--border);transition:transform .12s}
+.eq-card:active{transform:scale(.975)}
+
+/* ── Status label row ── */
+.status-label{font-size:9px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
+.badge{display:inline-flex;align-items:center;font-size:10.5px;font-weight:800;border-radius:99px;padding:4px 10px;white-space:nowrap;line-height:1.4;letter-spacing:.2px}
+
+/* ── Buttons ── */
+.btn{font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;border-radius:12px;border:none;cursor:pointer;padding:12px 14px;transition:opacity .15s,transform .1s;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;user-select:none}
+.btn:active{opacity:.82;transform:scale(.98)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-outline{background:var(--card);color:var(--text);border:1.5px solid var(--border)}
+.btn-ghost{background:transparent;color:var(--teal);border:1.5px solid var(--teal-mid)}
+.btn-red{background:var(--red);color:#fff}
+.btn-amber{background:var(--amber);color:#fff}
+
+/* ── Inputs ── */
+.inp{font-family:'Nunito',sans-serif;font-size:14px;padding:11px 13px;border-radius:11px;border:1.5px solid var(--border);outline:none;width:100%;color:var(--text);background:#fff;transition:border .15s,box-shadow .15s;-webkit-appearance:none}
+.inp:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(26,143,160,.12)}
+.inp.err{border-color:var(--red)}
+input[type=date].inp{color-scheme:light}
+.field-err{font-size:11px;color:var(--red);display:none;margin-top:3px;font-weight:600}
+
+/* ── Modal ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:100;animation:fadeIn .15s ease;backdrop-filter:blur(3px)}
+.mbox{background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;max-height:96vh;overflow-y:auto;padding:22px 18px 36px;display:flex;flex-direction:column;gap:13px;animation:slideUp .22s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(44px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ── Full-screen slide ── */
+.fullscreen{position:fixed;inset:0;background:var(--bg);z-index:50;overflow-y:auto;max-width:430px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;animation:slideRight .22s ease both}
+@media(min-width:600px) and (max-width:899px){.fullscreen{max-width:680px}}
+@keyframes slideRight{from{opacity:0;transform:translateX(calc(50% + 24px))}to{opacity:1;transform:translateX(-50%)}}
+.fs-header{background:var(--card);padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);position:sticky;top:0;z-index:10}
+.fs-back{background:var(--teal-lt);border:none;cursor:pointer;color:var(--teal);font-family:'Nunito',sans-serif;padding:7px 12px;border-radius:10px;font-weight:700;font-size:14px}
+
+/* ── Page hero ── */
+.page-hero{background:linear-gradient(135deg,var(--teal) 0%,var(--teal-dk) 100%);padding:26px 20px 22px;color:#fff}
+.page-hero h1{font-size:24px;font-weight:900;color:#fff;line-height:1.1}
+.page-hero p{font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:.8;text-transform:uppercase;margin-top:4px}
+
+/* ── Content padding (adapts per screen size) ── */
+.content-pad{padding:16px;display:flex;flex-direction:column}
+@media(min-width:900px){.content-pad{padding:24px 36px}}
+@media(min-width:600px) and (max-width:899px){.content-pad{padding:20px 24px}}
+
+/* ── Misc ── */
+.sec-lbl{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--sub);text-transform:uppercase}
+.ro-notice{background:#f8fafc;border:1.5px dashed var(--border);border-radius:11px;padding:11px 13px;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--sub);font-weight:600}
+.mcard-red{background:#fff5f5;border:1.5px solid var(--red);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.mcard-amb{background:#fffbeb;border:1.5px solid var(--amber);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.mcard-grn{background:var(--green-lt);border:1.5px solid var(--green);border-radius:14px;padding:16px;text-align:center;color:var(--green-dk);font-weight:700;font-size:14px}
+.toggle{width:46px;height:26px;border-radius:13px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.toggle-thumb{position:absolute;top:3px;width:20px;height:20px;border-radius:10px;background:#fff;transition:left .2s;box-shadow:0 1px 5px rgba(0,0,0,.22)}
+.info-row{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.search-wrap{position:relative}
+.search-wrap::before{content:"🔍";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;z-index:1;pointer-events:none}
+.search-wrap input{padding-left:36px}
+.report-row{padding:14px 16px;border-radius:14px;background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;cursor:pointer;transition:transform .12s}
+.report-row:active{transform:scale(.975)}
+#offline-bar{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#f97316;color:#fff;font-size:11px;font-weight:700;text-align:center;padding:6px;z-index:200;display:none}
+@media(min-width:600px) and (max-width:899px){#offline-bar{max-width:680px}}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+#sync-bar{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;font-size:12px;font-weight:700;padding:8px 18px;border-radius:99px;z-index:500;display:none;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);font-family:'Nunito',sans-serif;white-space:nowrap}
+@media(min-width:900px){#sync-bar{bottom:20px;left:calc(230px + 50%);transform:translateX(-50%)}}
+</style>
+</head>
+<body>
+<div id="offline-bar">⚠️ OFFLINE / DEMO MODE — Not for production use. Configure Supabase credentials. <a href="#" id="offline-bar-guide" style="color:#fff;font-weight:900;text-decoration:underline;margin-left:8px">Setup Guide →</a></div>
+<div id="app"></div>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════
+   1. SECURITY & STORAGE UTILITIES
+═══════════════════════════════════════════════════════ */
+function esc(s){
+  return String(s==null?"":s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\//g,"&#x2F;");
+}
+const san={
+  text:  s=>String(s==null?"":s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,"").replace(/<[^>]*>/g,"").trim().slice(0,200),
+  name:  s=>String(s==null?"":s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,"").replace(/<[^>]*>/g,"").trim().slice(0,120),
+  serial:s=>String(s==null?"":s).replace(/[^A-Za-z0-9 \-_./]/g,"").trim().slice(0,60),
+  notes: s=>String(s==null?"":s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,"").replace(/<[^>]*>/g,"").trim().slice(0,500),
+  date:  s=>{const m=(/^(\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))/).exec(String(s==null?"":s).trim());return m?m[1]:"";},
+  email: s=>String(s==null?"":s).toLowerCase().replace(/[^a-z0-9@._+\-]/g,"").slice(0,120),
+  num:   s=>{const n=parseInt(String(s==null?"":s));return isNaN(n)?0:n;},
+};
+const V={
+  name:      v=>v.trim().length>=2&&v.trim().length<=120,
+  serial:    v=>/^[A-Za-z0-9 \-_./]{1,60}$/.test(v.trim()),
+  email:     v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()),
+  date:      v=>/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v),
+  status:    v=>["functional_in_use","functional_not_in_use","non_functional","needs_repair","obsolete"].includes(v),
+  calStatus: v=>["cal_required","cal_not_required"].includes(v),
+};
+// Progressive login security — exponential backoff + lockout countdown
+const _loginState={failures:0,lockedUntil:0,delays:[0,1000,2000,4000,8000,15000]};
+function checkRate(){
+  const now=Date.now();
+  if(_loginState.lockedUntil>now){
+    const secs=Math.ceil((_loginState.lockedUntil-now)/1000);
+    return{ok:false,wait:secs,msg:"Too many failed attempts. Wait "+secs+"s."};
+  }
+  return{ok:true,wait:0};
+}
+function recordLoginFailure(){
+  _loginState.failures=Math.min(_loginState.failures+1,_loginState.delays.length-1);
+  _loginState.lockedUntil=Date.now()+(_loginState.delays[_loginState.failures]||15000);
+}
+function recordLoginSuccess(){_loginState.failures=0;_loginState.lockedUntil=0;}
+
+// Storage — loadP/saveP use localStorage (persistent), loadS/saveS use sessionStorage (auth)
+// Safe JSON parse — prevents prototype pollution from tampered storage values
+function safeJSON(str,fallback){
+  try{
+    const parsed=JSON.parse(str);
+    // Reject any object with __proto__ or constructor pollution attempt
+    if(parsed&&typeof parsed==="object"&&("__proto__" in parsed||"constructor" in parsed)){
+      console.warn("Prototype pollution attempt blocked in storage");
+      return fallback;
+    }
+    return parsed;
+  }catch{return fallback;}
+}
+function loadP(k,fb){try{const v=localStorage.getItem(k);return v?safeJSON(v,fb):fb;}catch{return fb;}}
+function saveP(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+function loadS(k,fb){try{const v=sessionStorage.getItem(k);return v?safeJSON(v,fb):fb;}catch{return fb;}}
+function saveS(k,v){try{sessionStorage.setItem(k,JSON.stringify(v));}catch{}}
+
+/* ── Offline write queue ────────────────────────────────────────
+   Saves pending writes to localStorage when offline.
+   On reconnect, flushes them to Supabase in order.
+   Prevents silent data loss during network interruptions.
+─────────────────────────────────────────────────────────────── */
+const QUEUE_KEY="medinv_offline_queue";
+function enqueueWrite(op){
+  const q=loadP(QUEUE_KEY,[]);
+  q.push({...op, ts:Date.now(), id:uid()});
+  saveP(QUEUE_KEY,q);
+  showSyncBanner(q.length);
+}
+function showSyncBanner(n){
+  let bar=document.getElementById("sync-bar");
+  if(!bar){bar=document.createElement("div");bar.id="sync-bar";bar.style.cssText="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;font-size:12px;font-weight:700;padding:8px 18px;border-radius:99px;z-index:500;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:90vw;font-family:Nunito,sans-serif";document.body.appendChild(bar);}
+  if(n>0){bar.innerHTML='⏳ '+n+' pending change'+(n>1?"s":"")+'  <button onclick="flushQueue()" style="background:var(--teal);border:none;color:#fff;border-radius:8px;padding:3px 10px;cursor:pointer;font-family:Nunito,sans-serif;font-size:11px;font-weight:700">Sync Now</button>';bar.style.display="flex";}
+  else{bar.style.display="none";}
+}
+async function flushQueue(){
+  const q=loadP(QUEUE_KEY,[]);
+  if(!q.length)return;
+  const remaining=[];
+  for(const op of q){
+    try{
+      if(op.type==="upsert"){
+        const i={...op.item};const isNew=i._isNew;delete i._isNew;
+        if(isNew)await sb.insert("equipment",i);
+        else await sb.safeUpdate("equipment",i.id,i,i.last_updated);
+      } else if(op.type==="delete"){
+        // Soft-delete: mark is_deleted=true (preserves audit trail, matches online path)
+        const knownDate=(op.item&&op.item.last_updated)||today();
+        await sb.safeUpdate("equipment",op.id,{is_deleted:true,last_updated:knownDate},knownDate);
+      } else if(op.type==="setting"){
+        await saveSettingToDB(op.key,op.val);
+      }
+    }catch(e){remaining.push(op);}
+  }
+  saveP(QUEUE_KEY,remaining);
+  showSyncBanner(remaining.length);
+  if(remaining.length<q.length){await fetchEquipment();showToast("✅ "+(q.length-remaining.length)+" pending changes synced","success");}
+  else if(remaining.length>0){showToast("⚠️ Some changes couldn't sync — will retry","error");}
+}
+// Try flushing queue whenever network comes back
+window.addEventListener("online",()=>{
+  STATE.offline=false;
+  const q=loadP(QUEUE_KEY,[]);
+  if(q.length){showToast("Network restored — syncing "+q.length+" pending change(s)…","info");flushQueue();}
+});
+window.addEventListener("offline",()=>{STATE.offline=true;});
+
+/* ═══════════════════════════════════════════════════════
+   2. CONFIGURATION — replace with your Supabase values
+   ─────────────────────────────────────────────────────
+   SECURITY NOTES:
+   • Use ONLY the "anon / public" key — NEVER the service_role key
+   • The anon key is safe to expose here because:
+     - RLS policies restrict what it can access
+     - REVOKE statements block all anon writes
+   • The service_role key bypasses ALL RLS — NEVER put it here
+   • Rotate the anon key in Supabase if you suspect compromise:
+     Settings → API → Reveal → Rotate
+═══════════════════════════════════════════════════════ */
+const SUPABASE_URL      = "https://qdswaslfrnqrpbbgajjc.supabase.co";
+const SUPABASE_ANON     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkc3dhc2xmcm5xcnBiYmdhampjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg3ODUsImV4cCI6MjA5NzcxNDc4NX0.jomuFpTFKhR0GpTC6ihGdqT2VR5c6Iosuzph3-2fod8";
+// hCaptcha site key (get from hcaptcha.com → Sites — FREE tier available)
+// Leave empty string "" to disable captcha (not recommended for production)
+// Also enable in Supabase: Authentication → Settings → Enable Captcha → hCaptcha
+const HCAPTCHA_SITE_KEY = ""; // e.g. "10000000-ffff-ffff-ffff-000000000001" for testing
+// Dynamically load hCaptcha only when a site key is configured
+if(HCAPTCHA_SITE_KEY){
+  const _hcs=document.createElement("script");
+  _hcs.src="https://js.hcaptcha.com/1/api.js";
+  _hcs.async=true;_hcs.defer=true;
+  document.head.appendChild(_hcs);
+}
+// Supabase Edge Functions URL (auto-derived from project URL)
+// Edge Functions add server-side rate limiting, logging, and business rules
+const EDGE_URL = SUPABASE_URL.includes("YOUR_PROJECT")?"":SUPABASE_URL.replace("supabase.co","supabase.co")+"/functions/v1"; // e.g. "10000000-ffff-ffff-ffff-000000000001" for testing
+
+/* ═══════════════════════════════════════════════════════
+   3. SUPABASE CLIENT
+═══════════════════════════════════════════════════════ */
+const sb=(()=>{
+  function hdr(x={}){
+    const tok=STATE?.adminSession?.access_token||SUPABASE_ANON;
+    return{"Content-Type":"application/json","apikey":SUPABASE_ANON,"Authorization":"Bearer "+tok,...x};
+  }
+  async function req(url,o={}){
+    const c=new AbortController(),t=setTimeout(()=>c.abort(),12000);
+    try{
+      const r=await fetch(url,{...o,signal:c.signal});
+      clearTimeout(t);
+      if(!r.ok&&r.status!==204){const tx=await r.text();throw new Error("HTTP "+r.status+": "+tx.slice(0,200));}
+      return r.status===204?null:r.json();
+    }catch(e){clearTimeout(t);throw e;}
+  }
+  return{
+    query:(t,p="")=>req(SUPABASE_URL+"/rest/v1/"+t+"?"+p,{headers:hdr({Prefer:"return=representation"})}),
+    insert:(t,b)=>req(SUPABASE_URL+"/rest/v1/"+t,{method:"POST",headers:hdr({Prefer:"return=representation"}),body:JSON.stringify(b)}),
+    safeUpdate:(t,id,b,knownDate)=>req(SUPABASE_URL+"/rest/v1/"+t+"?id=eq."+encodeURIComponent(id)+"&last_updated=eq."+encodeURIComponent(knownDate),{method:"PATCH",headers:hdr({Prefer:"return=representation"}),body:JSON.stringify(b)}),
+    remove:(t,id)=>req(SUPABASE_URL+"/rest/v1/"+t+"?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:hdr()}),
+    bulkInsert:(t,rows)=>req(SUPABASE_URL+"/rest/v1/"+t,{method:"POST",headers:hdr({Prefer:"return=representation,resolution=ignore-duplicates"}),body:JSON.stringify(rows)}),
+    signIn:(email,pw,captchaToken)=>req(SUPABASE_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_ANON},body:JSON.stringify({email,password:pw,...(captchaToken?{gotrue_meta_security:{captcha_token:captchaToken}}:{})})}),
+    signOut:(tok)=>req(SUPABASE_URL+"/auth/v1/logout",{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_ANON,"Authorization":"Bearer "+tok}}),
+    // Edge Function callers — these go through server-side functions
+    // with rate limiting, audit logging, and business validation
+    edgeBulkImport:(rows)=>EDGE_URL
+      ?req(EDGE_URL+"/bulk-import",{method:"POST",headers:hdr(),body:JSON.stringify({rows})})
+      :Promise.reject(new Error("Edge Functions not configured")),
+    edgeSoftDelete:(id)=>EDGE_URL
+      ?req(EDGE_URL+"/soft-delete",{method:"POST",headers:hdr(),body:JSON.stringify({id})})
+      :Promise.reject(new Error("Edge Functions not configured")),
+    edgeSetSetting:(key,value)=>EDGE_URL
+      ?req(EDGE_URL+"/set-setting",{method:"POST",headers:hdr(),body:JSON.stringify({key,value:JSON.stringify(value)})})
+      :null, // Falls back to direct REST if Edge not configured
+    // Settings table: key-value store synced across all devices
+    getSettings:()=>req(SUPABASE_URL+"/rest/v1/settings?select=key,value",{headers:hdr()}),
+    // ensure_my_profile: creates profile if missing AND returns role in one call
+    // Handles both sign-up flow AND Supabase Dashboard user creation
+    getMyRole:(email)=>req(SUPABASE_URL+"/rest/v1/rpc/ensure_my_profile",{
+      method:"POST",
+      headers:hdr({Prefer:"return=representation"}),
+      body:JSON.stringify({p_email:email||""}),
+    }),
+    setSetting:(key,value)=>{
+      // Upsert: POST with ON CONFLICT DO UPDATE (merge-duplicates) 
+      const h={...hdr()};
+      h["Prefer"]="resolution=merge-duplicates";
+      return req(SUPABASE_URL+"/rest/v1/settings",{
+        method:"POST",
+        headers:h,
+        body:JSON.stringify({key,value:JSON.stringify(value)}),
+      });
+    },
+  };
+})();
+
+/* ═══════════════════════════════════════════════════════
+   4. CONSTANTS
+═══════════════════════════════════════════════════════ */
+// ── Functional Status — exactly 5 options ──────────────────────────────────
+const STATUS_CFG={
+  functional_in_use:     {label:"Functional & In Use",       bg:"#22c55e",text:"#fff",icon:"✅"},
+  functional_not_in_use: {label:"Functional but Not in Use", bg:"#0891b2",text:"#fff",icon:"💤"},
+  non_functional:        {label:"Non-Functional",             bg:"#ef4444",text:"#fff",icon:"❌"},
+  needs_repair:          {label:"Needs Repair",               bg:"#dc2626",text:"#fff",icon:"🛠️"},
+  obsolete:              {label:"Obsolete",                   bg:"#6b7280",text:"#fff",icon:"🚫"},
+};
+// ── Calibration Status — exactly 2 options (separate from functional) ───────
+const CAL_STATUS={
+  cal_required:     {label:"Calibration Required",    bg:"#f59e0b",text:"#fff",icon:"🔧"},
+  cal_not_required: {label:"Calibration Not Required",bg:"#94a3b8",text:"#fff",icon:"—"},
+};
+
+const CHART_PAL=["#1a8fa0","#22c55e","#ef4444","#f59e0b","#3b82f6","#a855f7","#f97316","#14b8a6","#ec4899","#84cc16"];
+
+/* ── PM Recurrence engine ──────────────────────────────────────
+   Recurrence intervals stored per equipment.
+   When "Mark Maintenance Done" is clicked, next date is
+   auto-calculated based on the interval — not hardcoded +90 days.
+─────────────────────────────────────────────────────────────── */
+const RECURRENCE_OPTIONS={
+  "30":  {label:"Monthly (30 days)",    days:30},
+  "60":  {label:"Every 2 Months",       days:60},
+  "90":  {label:"Quarterly (90 days)",  days:90},
+  "180": {label:"Semi-Annual (6 months)",days:180},
+  "365": {label:"Annual (1 year)",      days:365},
+  "730": {label:"Every 2 Years",        days:730},
+  "0":   {label:"As Needed / Manual",   days:0},
+};
+const DEFAULT_RECURRENCE="90"; // quarterly default
+function recurrenceLabel(v){return(RECURRENCE_OPTIONS[String(v)]||RECURRENCE_OPTIONS[DEFAULT_RECURRENCE]).label;}
+
+/* ── Calibration recurrence ────────────────────────────────── */
+const CAL_RECURRENCE_OPTIONS={
+  "90":  {label:"Quarterly",       days:90},
+  "180": {label:"Semi-Annual",     days:180},
+  "365": {label:"Annual",          days:365},
+  "730": {label:"Every 2 Years",   days:730},
+  "0":   {label:"Manual / None",   days:0},
+};
+const DEFAULT_CAL_RECURRENCE="365"; // annual default
+
+function calcNextDate(fromDate,days){
+  if(!days||days===0)return fromDate; // manual — keep existing date
+  const d=new Date(fromDate||today());
+  d.setDate(d.getDate()+parseInt(days));
+  return d.toISOString().slice(0,10);
+}
+const DEFAULT_CATEGORIES=["Vital Signs","Monitoring","Diagnostic Equipment","Imaging","Life Support","Laboratory","Surgical","Other"];
+const DEFAULT_LOCATIONS  =["OPD","Emergency Room","Radiology","ICU","Ward A","Ward B","Operating Theatre","Laboratory","Pharmacy","Other"];
+const getCategories=()=>STATE.settings.categories||DEFAULT_CATEGORIES;
+const getLocations =()=>STATE.settings.locations ||DEFAULT_LOCATIONS;
+
+/* ═══════════════════════════════════════════════════════
+   5. SEED DATA
+═══════════════════════════════════════════════════════ */
+const SEED=[
+  {id:"1", name:"Weighing Scale",     category:"Vital Signs",         serial_number:"20345",      location:"OPD",           status:"functional_not_in_use",calibration_status:"cal_required",    last_calibration:"2025-10-10",next_calibration:"2026-10-10",next_maintenance:"2026-06-10",notes:"",                     last_updated:"2026-04-07"},
+  {id:"2", name:"ECG Machine",        category:"Monitoring",          serial_number:"AD 89453",   location:"Emergency Room",status:"functional_in_use",    calibration_status:"cal_required",    last_calibration:"2025-08-07",next_calibration:"2026-08-07",next_maintenance:"2026-08-07",notes:"",                     last_updated:"2026-04-07"},
+  {id:"3", name:"Ultrasound Machine", category:"Diagnostic Equipment",serial_number:"US-2024-001",location:"Radiology",     status:"non_functional",       calibration_status:"cal_required",    last_calibration:"2025-05-29",next_calibration:"2026-05-29",next_maintenance:"2026-05-29",notes:"Probe malfunction",    last_updated:"2026-04-07"},
+  {id:"4", name:"Defibrillator",      category:"Life Support",        serial_number:"DF-4421",    location:"Emergency Room",status:"functional_in_use",    calibration_status:"cal_required",    last_calibration:"2025-04-15",next_calibration:"2026-04-15",next_maintenance:"2026-07-15",notes:"",                     last_updated:"2026-04-06"},
+  {id:"5", name:"Infusion Pump",      category:"Life Support",        serial_number:"IP-0093",    location:"ICU",           status:"functional_in_use",    calibration_status:"cal_required",    last_calibration:"2025-01-15",next_calibration:"2026-01-15",next_maintenance:"2026-07-20",notes:"Calibration overdue",  last_updated:"2026-04-05"},
+  {id:"6", name:"Pulse Oximeter",     category:"Vital Signs",         serial_number:"PO-7821",    location:"Ward A",        status:"functional_in_use",    calibration_status:"cal_not_required",last_calibration:null,        next_calibration:null,        next_maintenance:"2026-07-01",notes:"",                     last_updated:"2026-04-04"},
+  {id:"7", name:"Ventilator",         category:"Life Support",        serial_number:"VN-2019-3",  location:"ICU",           status:"needs_repair",         calibration_status:"cal_required",    last_calibration:"2025-06-14",next_calibration:"2026-06-14",next_maintenance:"2026-06-14",notes:"Fan bearing worn",     last_updated:"2026-04-03"},
+  {id:"8", name:"Blood Glucose Meter",category:"Laboratory",          serial_number:"BG-112",     location:"Laboratory",    status:"obsolete",             calibration_status:"cal_not_required",last_calibration:null,        next_calibration:null,        next_maintenance:"2026-05-01",notes:"Scheduled for disposal",last_updated:"2026-04-02"},
+  {id:"9", name:"Syringe Pump",       category:"Life Support",        serial_number:"SP-2023-7",  location:"ICU",           status:"functional_in_use",    calibration_status:"cal_required",    last_calibration:"2025-06-01",next_calibration:"2026-06-01",next_maintenance:"2026-09-01",notes:"",                     last_updated:"2026-04-01"},
+  {id:"10",name:"Patient Monitor",    category:"Monitoring",          serial_number:"PM-3301",    location:"Ward B",        status:"functional_not_in_use",calibration_status:"cal_required",    last_calibration:"2025-09-01",next_calibration:"2026-09-01",next_maintenance:"2026-09-01",notes:"On standby",           last_updated:"2026-03-30"},
+];
+
+/* ═══════════════════════════════════════════════════════
+   6. STATE  (defined AFTER all helper functions)
+═══════════════════════════════════════════════════════ */
+const DEFAULT_SETTINGS={
+  hospitalName:"Hospital",
+  reminders:true,
+  calThreshold:30,
+  categories:[...DEFAULT_CATEGORIES],
+  locations:[...DEFAULT_LOCATIONS],
+};
+let STATE={
+  tab:"home",
+  equipment:[],
+  loading:true,
+  adminSession:loadS("medinv_admin",null),
+  adminEmail:loadS("medinv_admin",null)?.user?.email||"",
+  verifiedRole:loadS("medinv_role",""),  // fetched from DB on login
+  settings:loadP("medinv_settings",DEFAULT_SETTINGS),
+  modal:null,       // null|"adminLogin"|"add"|equipObj|"bulkUpload"|"sqlView"
+  detail:null,      // equipObj shown in read-only detail
+  report:null,      // null|"status"|"maintenance"|"location"|"category"
+  bulkResult:null,  // {valid:[], errors:[]}
+  qrItem:null,      // equipment item for QR modal
+  historyItem:null, // equipment item for service history
+  historyLogs:[],   // audit records for that item
+  auditLogs:[],     // loaded from Supabase audit_log table
+  search:"",
+  showAll:false,
+  offline:false,
+  chartInst:null,
+  lastFetch:0,
+  pollTimer:null,
+};
+
+/* ═══════════════════════════════════════════════════════
+   7. HELPERS
+═══════════════════════════════════════════════════════ */
+const today   =()=>new Date().toISOString().slice(0,10);
+const uid     =()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));
+const daysDiff=d=>{if(!d)return 9999;try{return Math.ceil((new Date(d)-new Date(today()))/86400000);}catch{return 9999;}};
+const fmtDate =d=>{try{return d?new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—";}catch{return d||"—";}};
+// Role verification — checks BOTH token AND cached DB-verified role
+const isAdmin    = ()=>!!STATE.adminSession?.access_token && STATE.verifiedRole==="admin";
+const isEngineer = ()=>!!STATE.adminSession?.access_token && ["admin","engineer"].includes(STATE.verifiedRole);
+const canEdit    = ()=>isAdmin()||isEngineer();
+
+// Calibration status helpers — purely date-driven
+const isCalOverdue  =e=>e.calibration_status==="cal_required"&&!!e.next_calibration&&daysDiff(e.next_calibration)<0;
+const isCalUpcoming =e=>e.calibration_status==="cal_required"&&!!e.next_calibration&&(()=>{const d=daysDiff(e.next_calibration);return d>=0&&d<=30;})();
+
+// Stats
+function getStats(){
+  const eq=STATE.equipment;
+  return{
+    total:      eq.length,
+    functional: eq.filter(e=>["functional_in_use","functional_not_in_use"].includes(e.status)).length,
+    overdue:    eq.filter(e=>daysDiff(e.next_maintenance)<0).length,
+    calOverdue: eq.filter(isCalOverdue).length,
+    needsRepair:eq.filter(e=>e.status==="needs_repair").length,
+    obsolete:   eq.filter(e=>e.status==="obsolete").length,
+    overdueList:eq.filter(e=>daysDiff(e.next_maintenance)<0),
+    upcoming:   eq.filter(e=>{const d=daysDiff(e.next_maintenance);return d>=0&&d<=30;}),
+    calOverdueList: eq.filter(isCalOverdue),
+    calUpcomingList:eq.filter(isCalUpcoming),
+  };
+}
+
+// Functional status badge HTML
+function funcBadge(status){
+  const s=STATUS_CFG[status]||{label:status,bg:"#94a3b8",text:"#fff",icon:"?"};
+  return '<span class="badge" style="background:'+s.bg+';color:'+s.text+'">'+s.icon+' '+esc(s.label)+'</span>';
+}
+// Calibration status badge HTML (state-aware — shows overdue/upcoming/required/not-required)
+function calBadge(e){
+  if(!e||e.calibration_status!=="cal_required"){
+    return '<span class="badge" style="background:#f1f5f9;color:#94a3b8;font-size:10px;border:1px solid #e2e8f0">— Not Required</span>';
+  }
+  if(isCalOverdue(e)){
+    const d=Math.abs(daysDiff(e.next_calibration));
+    return '<span class="badge" style="background:#b45309;color:#fff;font-size:10px">⏰ Cal Overdue '+d+'d</span>';
+  }
+  if(isCalUpcoming(e)){
+    const d=daysDiff(e.next_calibration);
+    return '<span class="badge" style="background:#d97706;color:#fff;font-size:10px">🔧 Cal Due in '+d+'d</span>';
+  }
+  return '<span class="badge" style="background:#f59e0b;color:#fff;font-size:10px">🔧 Cal Required</span>';
+}
+
+/* ═══════════════════════════════════════════════════════
+   8. DATA LAYER
+═══════════════════════════════════════════════════════ */
+async function fetchEquipment(){
+  // If offline flag is set, attempt a lightweight connectivity probe first.
+  // This recovers from transient Supabase errors that set offline=true even
+  // when the OS-level network never went down (so no "online" event fires).
+  if(STATE.offline){
+    const canReach=await probeSupabase();
+    if(!canReach){
+      STATE.equipment=JSON.parse(JSON.stringify(SEED));
+      STATE.loading=false;STATE.lastFetch=Date.now();render();return;
+    }
+    STATE.offline=false; // Supabase is reachable — clear the flag and continue
+  }
+  try{
+    const data=await sb.query("equipment","is_deleted=neq.true&order=last_updated.desc&limit=500");
+    if(Array.isArray(data)){
+      STATE.equipment=data;
+      STATE.offline=false; // Explicit clear on every successful fetch
+      // Warn if list is capped — facility may have >500 records
+      if(data.length===500){
+        showToast("⚠️ Showing first 500 records only — oldest equipment may not be visible","error");
+      }
+    }else throw new Error("Bad response");
+  }catch(e){
+    console.warn("Supabase fetch failed, using seed:",e.message);
+    STATE.equipment=JSON.parse(JSON.stringify(SEED));STATE.offline=true;
+  }
+  STATE.loading=false;STATE.lastFetch=Date.now();render();
+}
+
+// Lightweight Supabase reachability probe — HEAD request, no auth required
+async function probeSupabase(){
+  if(!SUPABASE_URL||SUPABASE_URL.includes("YOUR_PROJECT"))return false;
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/",{method:"HEAD",signal:AbortSignal.timeout(4000)});
+    return r.ok||r.status===401; // 401 = reached Supabase but not authed — that's fine
+  }catch{return false;}
+}
+
+async function persistEquipment(item){
+  if(!canEdit()&&!STATE.offline){showToast("Insufficient permissions","error");throw new Error("Permission denied");}
+  // Client-side serial uniqueness guard — catches same-session duplicates
+  // and provides a fast, friendly error before hitting the network.
+  // The DB UNIQUE constraint on serial_number is the authoritative enforcement.
+  const serialLower=item.serial_number.toLowerCase();
+  const duplicate=STATE.equipment.find(e=>
+    e.serial_number.toLowerCase()===serialLower &&
+    e.id!==item.id &&
+    !e.is_deleted
+  );
+  if(duplicate){
+    showToast("⚠️ Serial number \""+esc(item.serial_number)+"\" already exists ("+esc(duplicate.name)+")","error");
+    throw new Error("Duplicate serial");
+  }
+  if(STATE.offline){
+    const idx=STATE.equipment.findIndex(e=>e.id===item.id);
+    idx>=0?(STATE.equipment[idx]=item):STATE.equipment.unshift(item);
+    // Queue for sync when back online
+    enqueueWrite({type:"upsert",item:{...item}});
+    return item;
+  }
+  try{
+    if(item._isNew){const i={...item};delete i._isNew;const r=await sb.insert("equipment",i);return Array.isArray(r)?r[0]:r;}
+    const current=STATE.equipment.find(e=>e.id===item.id);
+    const knownDate=current?.last_updated||today();
+    const r=await sb.safeUpdate("equipment",item.id,item,knownDate);
+    if(Array.isArray(r)&&r.length===0){showToast("⚠️ Record changed by another user — refreshing…","error");await fetchEquipment();throw new Error("Conflict");}
+    return Array.isArray(r)?r[0]:r;
+  }catch(e){
+    // Handle Postgres unique constraint violation (serial_number UNIQUE index)
+    if(e.message&&(e.message.includes("23505")||e.message.toLowerCase().includes("unique"))){
+      showToast("⚠️ Serial number \""+esc(item.serial_number)+"\" already exists in the database","error");
+    } else if(e.message!=="Conflict"&&e.message!=="Duplicate serial"){
+      showToast("Save failed: "+e.message,"error");
+    }
+    throw e;
+  }
+}
+
+async function removeEquipment(id){
+  // SOFT DELETE — never permanently destroy records (preserves audit trail)
+  const item=STATE.equipment.find(e=>e.id===id);
+  if(!item)return;
+  const softDeleted={...item,is_deleted:true,last_updated:today()};
+  if(STATE.offline){
+    STATE.equipment=STATE.equipment.filter(e=>e.id!==id);
+    enqueueWrite({type:"delete",id,item:softDeleted});
+    return;
+  }
+  try{
+    // Try Edge Function first (adds server-side audit trail beyond DB trigger)
+    if(EDGE_URL){
+      await sb.edgeSoftDelete(id);
+    } else {
+      // Fallback: direct REST soft-delete (still protected by RLS)
+      await sb.safeUpdate("equipment",id,{is_deleted:true,last_updated:today()},item.last_updated);
+    }
+    STATE.equipment=STATE.equipment.filter(e=>e.id!==id);
+  }catch(e){showToast("Delete failed: "+e.message,"error");throw e;}
+}
+
+async function bulkPersist(rows){
+  if(STATE.offline){
+    rows.forEach(r=>{if(!STATE.equipment.find(e=>e.serial_number.toLowerCase()===r.serial_number.toLowerCase()))STATE.equipment.unshift(r);});
+    return{inserted:rows.length,skipped:0};
+  }
+  try{
+    // Try Edge Function first (server-side rate limiting + per-operation audit log)
+    if(EDGE_URL){
+      const r=await sb.edgeBulkImport(rows);
+      return{inserted:r?.inserted||rows.length,skipped:r?.skipped||0,via:"edge"};
+    }
+    // Fallback: direct REST (still protected by RLS)
+    const r=await sb.bulkInsert("equipment",rows);
+    const inserted=Array.isArray(r)?r.length:0;
+    return{inserted,skipped:rows.length-inserted,via:"rest"};
+  }catch(e){showToast("Bulk save failed: "+e.message,"error");throw e;}
+}
+
+/* ═══════════════════════════════════════════════════════
+   9. REAL-TIME POLLING (multi-user concurrency)
+═══════════════════════════════════════════════════════ */
+/* ── Supabase Realtime subscription ───────────────────────────
+   Replaces inefficient 30s polling with instant push updates.
+   Falls back to polling if Realtime is unavailable.
+   Reconnect uses exponential backoff — max 5 attempts then
+   permanently falls back to polling to avoid memory exhaustion
+   on low-RAM devices common in field deployments.
+────────────────────────────────────────────────────────────── */
+let _realtimeChannel=null;
+let _wsAttempts=0;
+const WS_MAX_ATTEMPTS=5;
+const WS_BACKOFF_MS=[5000,10000,20000,40000,60000]; // caps at 60s
+
+function startRealtime(){
+  if(STATE.offline||!SUPABASE_URL.includes("supabase.co"))return startPolling();
+  if(_wsAttempts>=WS_MAX_ATTEMPTS){
+    // Too many failed attempts — permanent polling fallback to protect low-RAM devices
+    console.warn("WebSocket: max reconnect attempts reached, switching to polling permanently");
+    return startPolling();
+  }
+  try{
+    // Use Supabase Realtime REST channel (no extra library needed)
+    const wsUrl=SUPABASE_URL.replace("https://","wss://")
+      +"/realtime/v1/websocket?apikey="+SUPABASE_ANON+"&vsn=1.0.0";
+    const ws=new WebSocket(wsUrl);
+    ws.onopen=()=>{
+      _wsAttempts=0; // Reset backoff counter on successful connection
+      // Join the equipment table changes channel
+      ws.send(JSON.stringify({
+        topic:"realtime:public:equipment",
+        event:"phx_join",
+        payload:{config:{broadcast:{self:false},presence:{key:""},postgres_changes:[
+          {event:"*",schema:"public",table:"equipment"}
+        ]}},
+        ref:"1"
+      }));
+    };
+    ws.onmessage=async(evt)=>{
+      try{
+        const msg=JSON.parse(evt.data);
+        if(msg.event==="postgres_changes"||msg.payload?.type==="INSERT"||msg.payload?.type==="UPDATE"||msg.payload?.type==="DELETE"){
+          // Another user changed equipment — refresh silently
+          if(!STATE.modal&&!STATE.detail){
+            await fetchEquipment();
+            showToast("🔄 Equipment updated","info");
+          }
+        }
+      }catch{}
+    };
+    ws.onerror=()=>{
+      // Graceful fallback to polling if WebSocket fails
+      startPolling();
+    };
+    ws.onclose=()=>{
+      // Exponential backoff reconnect — capped at WS_MAX_ATTEMPTS
+      const delay=WS_BACKOFF_MS[Math.min(_wsAttempts,WS_BACKOFF_MS.length-1)];
+      _wsAttempts++;
+      setTimeout(startRealtime,delay);
+    };
+    _realtimeChannel=ws;
+  }catch{
+    // Fallback to polling
+    startPolling();
+  }
+}
+
+// Legacy polling fallback (used when Realtime WebSocket unavailable)
+function startPolling(){
+  if(STATE.pollTimer)return;
+  STATE.pollTimer=setInterval(async()=>{
+    if(STATE.offline||STATE.loading||STATE.modal||STATE.detail)return;
+    try{
+      // Use full ISO timestamp (not date-only) — avoids matching records updated
+      // earlier the same day, which would cause spurious full-refreshes every 30s
+      const since=STATE.lastFetch?new Date(STATE.lastFetch).toISOString():new Date(0).toISOString();
+      const r=await sb.query("equipment","last_updated=gte."+encodeURIComponent(since)+"&select=id");
+      if(Array.isArray(r)&&r.length>0){await fetchEquipment();showToast("🔄 Equipment updated by another user","info");}
+      const prevName=STATE.settings.hospitalName;
+      await loadSettingsFromDB();
+      if(STATE.settings.hospitalName!==prevName){render();}
+    }catch{}
+  },30000);
+}
+
+/* ═══════════════════════════════════════════════════════
+   10. AUTH
+═══════════════════════════════════════════════════════ */
+async function doLogin(email,pw){
+  const rateCheck=checkRate();if(!rateCheck.ok)return{ok:false,msg:rateCheck.msg};
+  const e2=san.email(email);
+  if(!V.email(e2))return{ok:false,msg:"Enter a valid email address."};
+  if(!pw||pw.length<6||pw.length>200)return{ok:false,msg:"Password must be 6–200 characters."};
+  if(STATE.offline){
+    // DEMO/OFFLINE MODE: Only active when SUPABASE_URL is not configured.
+    // This code path MUST be removed or disabled before any production deployment.
+    // Do not deploy this app with YOUR_PROJECT still in the URL.
+    if(!SUPABASE_URL.includes("YOUR_PROJECT")){
+      // Supabase is configured but we somehow ended up offline — fail safely
+      return{ok:false,msg:"Cannot authenticate: no network connection to Supabase."};
+    }
+    const sess={access_token:"demo_"+uid(),user:{email:e2,id:"demo-user"}};
+    STATE.adminSession=sess;STATE.adminEmail=e2;saveS("medinv_admin",sess);return{ok:true};
+  }
+  try{
+    // Get hCaptcha token if widget is mounted
+    let captchaToken="";
+    if(HCAPTCHA_SITE_KEY){
+      try{
+        const resp=hcaptcha.getResponse();
+        if(!resp){showToast("Please complete the captcha","error");if(btn){btn.disabled=false;btn.textContent="Login";}return{ok:false,msg:"Captcha required."};}
+        captchaToken=resp;
+      }catch{/* hCaptcha not loaded — proceed without */}
+    }
+    const r=await sb.signIn(e2,pw,captchaToken);
+    if(r?.access_token){STATE.adminSession=r;STATE.adminEmail=r.user?.email||e2;saveS("medinv_admin",r);recordLoginSuccess();return{ok:true};}
+    return{ok:false,msg:r?.error_description||r?.message||"Invalid credentials."};
+  }catch(e){return{ok:false,msg:"Login error: "+e.message};}
+}
+async function doLogout(){
+  if(STATE.adminSession?.access_token&&!STATE.offline)try{await sb.signOut(STATE.adminSession.access_token);}catch{}
+  STATE.adminSession=null;STATE.adminEmail="";STATE.verifiedRole="";
+  sessionStorage.removeItem("medinv_admin");
+  sessionStorage.removeItem("medinv_role");
+}
+
+/* ═══════════════════════════════════════════════════════
+   10b. SETTINGS SYNC (Supabase ↔ all devices)
+   Settings are stored in a Supabase 'settings' table
+   so changes on one device appear on all others.
+   localStorage is used as an offline fallback only.
+═══════════════════════════════════════════════════════ */
+async function loadSettingsFromDB(){
+  if(STATE.offline)return; // use localStorage fallback
+  try{
+    const rows=await sb.getSettings();
+    if(!Array.isArray(rows))return;
+    const map={};
+    rows.forEach(r=>{try{map[r.key]=JSON.parse(r.value);}catch{map[r.key]=r.value;}});
+    // Merge into STATE.settings (Supabase wins over localStorage)
+    if(map.hospitalName)   STATE.settings.hospitalName=map.hospitalName;
+    if(map.reminders!==undefined) STATE.settings.reminders=map.reminders;
+    if(map.calThreshold)   STATE.settings.calThreshold=map.calThreshold;
+    if(map.categories&&Array.isArray(map.categories)) STATE.settings.categories=map.categories;
+    if(map.locations&&Array.isArray(map.locations))   STATE.settings.locations=map.locations;
+    // Write merged result to localStorage as cache
+    saveP("medinv_settings",STATE.settings);
+  }catch(e){console.warn("Settings load failed:",e.message);}
+}
+
+async function saveSettingToDB(key,value){
+  // Always write to localStorage first (instant, offline-safe)
+  STATE.settings[key]=value;
+  saveP("medinv_settings",STATE.settings);
+  // Then sync to Supabase (admin only — enforced by RLS)
+  if(!STATE.offline){
+    try{
+      // Try Edge Function first — provides server-side validation + logging
+      if(EDGE_URL){
+        const r=await sb.edgeSetSetting(key,value);
+        if(r===null)await sb.setSetting(key,value); // null means Edge not deployed yet
+      } else {
+        await sb.setSetting(key,value);
+      }
+    }catch(e){
+      // Fallback to direct REST
+      try{await sb.setSetting(key,value);}
+      catch(e2){console.warn("Setting sync failed:",e2.message);}
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   11. BULK UPLOAD
+═══════════════════════════════════════════════════════ */
+const BULK_COLS=["name","category","serial_number","location","status","next_maintenance","calibration_status","last_calibration","next_calibration","notes"];
+
+function downloadTemplate(){
+  if(typeof XLSX==="undefined"){showToast("Excel library not loaded","error");return;}
+  // Always use the CURRENT categories and locations from settings
+  const cats=getCategories();
+  const locs=getLocations();
+  const catStr=cats.join(" | ");
+  const locStr=locs.join(" | ");
+
+  // Build dropdown lists in Excel using data validation hints in hint row
+  const rows=[
+    // Row 1: Headers (bold in Excel)
+    ["name","category","serial_number","location","status","next_maintenance","calibration_status","last_calibration","next_calibration","notes"],
+    // Row 2: Validation hints — shows exactly what is valid for THIS hospital
+    [
+      "2-120 characters · Required",
+      "One of: "+catStr,
+      "Alphanumeric, dash, dot, slash · Max 60 · Required",
+      "One of: "+locStr,
+      "functional_in_use | functional_not_in_use | non_functional | needs_repair | obsolete · Required",
+      "YYYY-MM-DD or DD/MM/YYYY · Required",
+      "cal_required (or: yes, y) | cal_not_required (or: no, n) · Required",
+      "YYYY-MM-DD or DD/MM/YYYY · Optional",
+      "YYYY-MM-DD or DD/MM/YYYY · Required only if calibration_status=cal_required",
+      "Any text · Max 500 · Optional"
+    ],
+    // Row 3: Status reference (readable labels)
+    ["--- STATUS REFERENCE ---","Functional & In Use","functional_in_use","","","","","","",""],
+    ["","Functional but Not in Use","functional_not_in_use","","","","","","",""],
+    ["","Non-Functional","non_functional","","","","","","",""],
+    ["","Needs Repair","needs_repair","","","","","","",""],
+    ["","Obsolete","obsolete","","","","","","",""],
+    ["--- SAMPLE DATA BELOW ---","","","","","","","","",""],
+    // Sample rows using ACTUAL current categories and locations
+    ["ECG Machine",         cats[0]||"Monitoring",        "ECG-001",   locs[0]||"OPD",           "functional_in_use",    today(),"cal_required",    "2025-06-01","2026-06-01","Annual calibration"],
+    ["Weighing Scale",      cats[1]||"Vital Signs",       "WS-202",    locs[1]||"Ward A",        "functional_not_in_use",today(),"cal_not_required","",          "",          ""],
+    ["Ultrasound Machine",  cats[2]||"Diagnostic Equipment","US-003",  locs[2]||"Radiology",     "non_functional",       today(),"cal_required",    "2024-09-01","2025-09-01","Probe fault"],
+    ["Defibrillator",       cats[3]||"Life Support",      "DF-004",    locs[3]||"Emergency Room","needs_repair",         today(),"cal_required",    "2025-03-01","2026-03-01","Fan bearing worn"],
+    ["Blood Glucose Meter", cats[4]||"Laboratory",        "BG-005",    locs[4]||"Laboratory",    "obsolete",             today(),"cal_not_required","",          "",          "Scheduled for disposal"],
+  ];
+
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  // Column widths
+  ws["!cols"]=[22,28,18,22,28,16,24,15,15,32].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Equipment_Import");
+  XLSX.writeFile(wb,"medequip-template-"+today()+".xlsx");
+  showToast("Template downloaded with your current categories and locations ✓","success");
+}
+
+function parseBulkFile(file){
+  if(!file)return;
+  const allowed=["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel","text/csv","application/csv"];
+  const ext=file.name.split(".").pop().toLowerCase();
+  if(!allowed.includes(file.type)&&!["xlsx","xls","csv"].includes(ext)){
+    showToast("Only Excel (.xlsx/.xls) or CSV files are allowed","error");return;
+  }
+  if(file.size>5*1024*1024){showToast("File too large (max 5MB)","error");return;}
+
+  /* ── Smart date normaliser ──────────────────────────────────
+     Accepts: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, D-M-YYYY,
+              "April 10, 2026", Excel serial numbers, ISO with time
+  ───────────────────────────────────────────────────────────── */
+  function normaliseDate(raw){
+    if(!raw)return"";
+    const s=String(raw).trim();
+    if(!s||s.toLowerCase()==="n/a"||s.toLowerCase()==="none")return"";
+
+    // Already YYYY-MM-DD
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+
+    // YYYY-MM-DD with time suffix e.g. "2026-04-10 00:00:00" or "2026-04-10T..."
+    const dtMatch=s.match(/^(\d{4}-\d{2}-\d{2})[T ]/);
+    if(dtMatch)return dtMatch[1];
+
+    // Excel numeric serial date (e.g. 46200)
+    if(/^\d{4,6}$/.test(s)){
+      const n=parseInt(s);
+      if(n>10000&&n<100000){
+        const d=new Date((n-25569)*86400000);
+        return d.toISOString().slice(0,10);
+      }
+    }
+
+    // DD/MM/YYYY or MM/DD/YYYY — try both and pick the valid one
+    const slash=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if(slash){
+      const [,a,b,y]=slash;
+      // If first part > 12, must be DD/MM
+      if(parseInt(a)>12){
+        const d=new Date(y+"-"+b.padStart(2,"0")+"-"+a.padStart(2,"0"));
+        if(!isNaN(d))return d.toISOString().slice(0,10);
+      }
+      // Try MM/DD/YYYY first (US format)
+      const us=new Date(y+"-"+a.padStart(2,"0")+"-"+b.padStart(2,"0"));
+      if(!isNaN(us))return us.toISOString().slice(0,10);
+    }
+
+    // "April 10, 2026" or "10 April 2026"
+    const parsed=new Date(s);
+    if(!isNaN(parsed)&&parsed.getFullYear()>2000)return parsed.toISOString().slice(0,10);
+
+    return""; // Could not parse
+  }
+
+  /* ── Smart status normaliser ────────────────────────────────
+     Maps labels and variations → internal key
+  ───────────────────────────────────────────────────────────── */
+  const STATUS_ALIASES={
+    "functional_in_use":"functional_in_use",
+    "functional & in use":"functional_in_use",
+    "functional and in use":"functional_in_use",
+    "functional - in use":"functional_in_use",
+    "in use":"functional_in_use",
+    "functional":"functional_in_use",
+    "functional_not_in_use":"functional_not_in_use",
+    "functional but not in use":"functional_not_in_use",
+    "functional not in use":"functional_not_in_use",
+    "not in use":"functional_not_in_use",
+    "standby":"functional_not_in_use",
+    "non_functional":"non_functional",
+    "non-functional":"non_functional",
+    "non functional":"non_functional",
+    "not working":"non_functional",
+    "broken":"non_functional",
+    "faulty":"non_functional",
+    "needs_repair":"needs_repair",
+    "needs repair":"needs_repair",
+    "needs service":"needs_repair",
+    "under repair":"needs_repair",
+    "repair":"needs_repair",
+    "obsolete":"obsolete",
+    "condemned":"obsolete",
+    "decommissioned":"obsolete",
+    "disposed":"obsolete",
+    "written off":"obsolete",
+  };
+  function normaliseStatus(raw){
+    const s=String(raw||"").toLowerCase().trim().replace(/\s+/g," ");
+    return STATUS_ALIASES[s]||s.replace(/[\s\-]+/g,"_");
+  }
+
+  /* ── Smart calibration status normaliser ────────────────────
+  ───────────────────────────────────────────────────────────── */
+  const CAL_ALIASES={
+    "cal_required":"cal_required",
+    "calibration required":"cal_required",
+    "required":"cal_required",
+    "yes":"cal_required",
+    "y":"cal_required",
+    "true":"cal_required",
+    "1":"cal_required",
+    "cal_not_required":"cal_not_required",
+    "calibration not required":"cal_not_required",
+    "not required":"cal_not_required",
+    "no":"cal_not_required",
+    "n":"cal_not_required",
+    "false":"cal_not_required",
+    "0":"cal_not_required",
+    "none":"cal_not_required",
+    "n/a":"cal_not_required",
+  };
+  function normaliseCalStatus(raw){
+    const s=String(raw||"").toLowerCase().trim();
+    return CAL_ALIASES[s]||s.replace(/\s+/g,"_");
+  }
+
+  /* ── Smart category/location matcher ────────────────────────
+     Case-insensitive, trim, partial match allowed
+  ───────────────────────────────────────────────────────────── */
+  function matchList(value, list){
+    const v=String(value||"").trim().toLowerCase();
+    if(!v)return null;
+    // Exact match first
+    const exact=list.find(l=>l.toLowerCase()===v);
+    if(exact)return exact;
+    // Partial match (starts with)
+    const partial=list.find(l=>l.toLowerCase().startsWith(v)||v.startsWith(l.toLowerCase()));
+    if(partial)return partial;
+    // Contains match
+    const contains=list.find(l=>l.toLowerCase().includes(v)||v.includes(l.toLowerCase()));
+    return contains||null;
+  }
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:"array",cellDates:false});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+      if(!raw||raw.length<2){showToast("File is empty or unreadable","error");return;}
+
+      // Find header row (row containing "name" in col A, case-insensitive)
+      let headerIdx=0;
+      for(let i=0;i<Math.min(5,raw.length);i++){
+        if(String(raw[i][0]||"").toLowerCase().trim()==="name"){headerIdx=i;break;}
+      }
+      const dataRows=raw.slice(headerIdx+1);
+      const cats=getCategories();
+      const locs=getLocations();
+
+      const valid=[],errors=[],warnings=[];
+
+      dataRows.forEach((row,ri)=>{
+        if(!row||row.every(c=>!String(c||"").trim()))return;
+        const rn=headerIdx+ri+2;
+        const rowWarnings=[];
+
+        // ── Read raw values ─────────────────────────────────
+        const nm    =san.name(String(row[0]||""));
+        const rawCat=String(row[1]||"").trim();
+        const ser   =san.serial(String(row[2]||""));
+        const rawLoc=String(row[3]||"").trim();
+        const rawSt =String(row[4]||"").trim();
+        const rawDt =String(row[5]||"").trim();
+        const rawCs =String(row[6]||"").trim();
+        const rawLc =String(row[7]||"").trim();
+        const rawNc =String(row[8]||"").trim();
+        const notes =san.notes(String(row[9]||""));
+
+        // ── Smart normalisation ─────────────────────────────
+        const matchedCat=matchList(rawCat, cats);
+        const matchedLoc=matchList(rawLoc, locs);
+        const st  =normaliseStatus(rawSt);
+        const nm2 =normaliseDate(rawDt);
+        const cs  =normaliseCalStatus(rawCs);
+        const lc  =normaliseDate(rawLc);
+        const nc  =normaliseDate(rawNc);
+
+        // If category/location was matched by partial/contains, warn but accept
+        if(matchedCat&&matchedCat.toLowerCase()!==rawCat.toLowerCase()){
+          rowWarnings.push("category '"+rawCat+"' auto-matched to '"+matchedCat+"'");
+        }
+        if(matchedLoc&&matchedLoc.toLowerCase()!==rawLoc.toLowerCase()){
+          rowWarnings.push("location '"+rawLoc+"' auto-matched to '"+matchedLoc+"'");
+        }
+
+        // ── Validate ────────────────────────────────────────
+        const errs=[];
+        if(!V.name(nm))
+          errs.push("name: must be 2–120 characters");
+
+        if(!matchedCat)
+          errs.push("category '"+san.text(rawCat)+"' not found. Valid: "+cats.join(", "));
+
+        if(!V.serial(ser))
+          errs.push("serial_number: use only letters, numbers, spaces, - _ . /  (max 60)");
+
+        if(valid.find(v=>v.serial_number.toLowerCase()===ser.toLowerCase()))
+          errs.push("serial_number '"+ser+"' duplicated within this file");
+
+        if(STATE.equipment.find(eq=>eq.serial_number.toLowerCase()===ser.toLowerCase()))
+          errs.push("serial_number '"+ser+"' already exists in inventory");
+
+        if(!matchedLoc)
+          errs.push("location '"+san.text(rawLoc)+"' not found. Valid: "+locs.join(", "));
+
+        if(!V.status(st))
+          errs.push("status '"+san.text(rawSt)+"': use one of — Functional & In Use, Functional but Not in Use, Non-Functional, Needs Repair, Obsolete");
+
+        if(!nm2)
+          errs.push("next_maintenance '"+san.text(rawDt)+"': use YYYY-MM-DD, DD/MM/YYYY or MM/DD/YYYY");
+
+        if(!V.calStatus(cs))
+          errs.push("calibration_status '"+san.text(rawCs)+"': use 'cal_required', 'yes', 'cal_not_required', or 'no'");
+
+        if(cs==="cal_required"&&!nc)
+          errs.push("next_calibration required when calibration_status is cal_required");
+
+        if(rawLc&&!lc)
+          errs.push("last_calibration '"+san.text(rawLc)+"': use YYYY-MM-DD, DD/MM/YYYY or MM/DD/YYYY");
+
+        if(errs.length){
+          errors.push({row:rn, msg:errs.join(" · "), warnings:rowWarnings});
+        } else {
+          if(rowWarnings.length)warnings.push({row:rn, msgs:rowWarnings});
+          valid.push({
+            id:uid(),
+            name:nm,
+            category:matchedCat,
+            serial_number:ser,
+            location:matchedLoc,
+            status:st,
+            next_maintenance:nm2,
+            calibration_status:cs,
+            last_calibration:lc||null,
+            next_calibration:cs==="cal_required"?(nc||null):null,
+            notes,
+            last_updated:today(),
+          });
+        }
+      });
+
+      STATE.bulkResult={valid,errors,warnings};
+      render();
+    }catch(err){
+      showToast("Failed to parse file: "+err.message,"error");
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function confirmBulk(){
+  if(!STATE.bulkResult?.valid?.length)return;
+  const btn=document.getElementById("btn-confirm-bulk");
+  if(btn){btn.disabled=true;btn.textContent="Importing…";}
+  try{
+    const {inserted,skipped}=await bulkPersist(STATE.bulkResult.valid);
+    STATE.bulkResult=null;STATE.modal=null;
+    await fetchEquipment();
+    showToast("Imported "+inserted+" items"+(skipped?" · "+skipped+" skipped":""),"success");
+  }catch{if(btn){btn.disabled=false;btn.textContent="Import "+STATE.bulkResult.valid.length+" Items";}}
+}
+
+/* ═══════════════════════════════════════════════════════
+   12. EXPORTS
+═══════════════════════════════════════════════════════ */
+function exportCSV(){
+  const cols=["name","category","serial_number","location","status","next_maintenance","calibration_status","last_calibration","next_calibration","notes","last_updated"];
+  const head=["Name","Category","Serial No","Location","Functional Status","Next Maintenance","Calibration Status","Last Calibration","Next Calibration","Notes","Last Updated"];
+  const rows=STATE.equipment.map(e=>cols.map(c=>{
+    let v=String(e[c]||"");
+    if(c==="status")v=STATUS_CFG[e.status]?.label||v;
+    if(c==="calibration_status")v=CAL_STATUS[e.calibration_status]?.label||v;
+    return'"'+v.replace(/"/g,'""')+'"';
+  }).join(","));
+  dlBlob([head.join(","),...rows].join("\r\n"),"medequip-"+today()+".csv","text/csv;charset=utf-8;");
+}
+function exportExcel(){
+  const rows=STATE.equipment.map(e=>({
+    Name:e.name,Category:e.category,"Serial No":e.serial_number,Location:e.location,
+    "Functional Status":STATUS_CFG[e.status]?.label||e.status,
+    "Next Maintenance":e.next_maintenance,
+    "Calibration Status":CAL_STATUS[e.calibration_status]?.label||e.calibration_status||"",
+    "Last Calibration":e.last_calibration||"",
+    "Next Calibration":e.next_calibration||"",
+    Notes:e.notes||"","Last Updated":e.last_updated,
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws["!cols"]=[20,18,14,18,22,16,22,14,16,28,13].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Equipment");
+  XLSX.writeFile(wb,"medequip-"+today()+".xlsx");
+}
+async function exportPDF(){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+  doc.setFont("helvetica","bold");doc.setFontSize(14);doc.setTextColor(26,143,160);
+  doc.text(san.text(STATE.settings.hospitalName)+" — Medical Equipment Inventory",14,14);
+  doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(100,116,139);
+  doc.text("Generated: "+new Date().toLocaleString()+" | Total: "+STATE.equipment.length+" items",14,20);
+  doc.autoTable({
+    startY:24,
+    head:[["Name","Category","Serial","Location","Functional Status","Maint. Date","Cal. Status","Next Cal."]],
+    body:STATE.equipment.map(e=>[e.name,e.category,e.serial_number,e.location,STATUS_CFG[e.status]?.label||e.status,e.next_maintenance,CAL_STATUS[e.calibration_status]?.label||"—",e.next_calibration||"—"]),
+    styles:{font:"helvetica",fontSize:7.5,cellPadding:2.5},
+    headStyles:{fillColor:[26,143,160],fontStyle:"bold",fontSize:8},
+    alternateRowStyles:{fillColor:[245,248,250]},
+  });
+  doc.save("medequip-"+today()+".pdf");
+}
+function dlBlob(content,name,type){
+  const b=new Blob(["\uFEFF"+content],{type}),a=document.createElement("a");
+  a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();
+  document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+}
+
+/* ═══════════════════════════════════════════════════════
+   13. RENDER ENGINE
+═══════════════════════════════════════════════════════ */
+function renderSidebar(){
+  const tabs=[
+    {id:"home",ico:"🏠",lbl:"Home"},
+    {id:"equipment",ico:"📋",lbl:"Equipment"},
+    {id:"maintenance",ico:"🔧",lbl:"Maintenance"},
+    {id:"reports",ico:"📊",lbl:"Reports"},
+    {id:"settings",ico:"⚙️",lbl:"Settings"},
+  ];
+  return '<div id="sidebar">'+
+    '<div style="padding:0 20px 24px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:16px">'+
+      '<div style="font-size:22px;font-weight:900;color:#fff;line-height:1.1">🏥 MedEquip</div>'+
+      '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1.5px;margin-top:4px">Inventory System</div>'+
+    '</div>'+
+    tabs.map(t=>{
+      const active=STATE.tab===t.id;
+      return '<button data-nav="'+t.id+'" style="display:flex;align-items:center;gap:12px;padding:12px 20px;width:100%;background:'+(active?"rgba(255,255,255,.15)":"none")+';border:none;cursor:pointer;text-align:left;border-left:3px solid '+(active?"#fff":"transparent")+';transition:background .15s;margin-bottom:2px">'+
+        '<span style="font-size:18px;opacity:'+(active?1:.65)+'">'+t.ico+'</span>'+
+        '<span style="font-size:14px;font-weight:'+(active?800:600)+';color:'+(active?"#fff":"rgba(255,255,255,.7)")+'">'+t.lbl+'</span>'+
+      '</button>';
+    }).join("")+
+    '<div style="flex:1"></div>'+
+    '<div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,.12);margin-top:16px">'+
+      (isAdmin()
+        ?'<div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:6px;font-weight:600">🟢 Admin</div>'+
+          '<div style="font-size:12px;color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(STATE.adminEmail)+'</div>'
+        :'<div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:600">👁 Read-Only Mode</div>')+
+    '</div>'+
+    (STATE.offline?'<div style="margin:0 12px 12px;background:rgba(249,115,22,.3);border-radius:8px;padding:7px 12px;font-size:10px;font-weight:700;color:#fed7aa;text-align:center">⚠️ Demo Mode</div>':"")+
+  '</div>';
+}
+
+function render(){
+  const app=document.getElementById("app");if(!app)return;
+  document.getElementById("offline-bar").style.display=STATE.offline?"block":"none";
+  if(STATE.loading){
+    app.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;background:var(--bg);width:100%"><div style="font-size:56px;animation:pulse 1.5s infinite">🏥</div><div style="font-weight:900;color:var(--teal);font-size:18px">Loading MedEquip…</div><style>@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}</style></div>';
+    return;
+  }
+  const fns={home:renderHome,equipment:renderEquipment,maintenance:renderMaintenance,reports:renderReports,settings:renderSettings};
+  const screen=(fns[STATE.tab]||renderHome)();
+  const nav=renderNav();
+  const sidebar=renderSidebar();
+  const modal=STATE.modal?renderModal():"";
+  const detail=STATE.detail?renderDetail():"";
+  const report=STATE.report?renderReportDetail():"";
+  app.innerHTML=sidebar+'<div id="main-content">'+screen+nav+'</div>'+modal+detail+report;
+  bindEvents();
+  if(STATE.report)renderChart();
+}
+
+/* ─── NAVIGATION ─────────────────────────────────── */
+function renderNav(){
+  const tabs=[{id:"home",ico:"🏠",lbl:"Home"},{id:"equipment",ico:"📋",lbl:"Equipment"},{id:"maintenance",ico:"🔧",lbl:"Maint."},{id:"reports",ico:"📊",lbl:"Reports"},{id:"settings",ico:"⚙️",lbl:"Settings"}];
+  return '<nav class="bnav">'+tabs.map(t=>'<button class="nbtn '+(STATE.tab===t.id?"active":"")+'" data-nav="'+esc(t.id)+'" aria-label="'+esc(t.lbl)+'"><span class="ico">'+t.ico+'</span><span class="lbl">'+esc(t.lbl)+'</span></button>').join("")+'</nav>';
+}
+
+/* ─── HOME ───────────────────────────────────────── */
+function renderHome(){
+  const s=getStats();
+  const tiles=[
+    {ico:"📊",n:s.total,       lbl:"Total Equipment",  bar:"#3b82f6",nav:"equipment"},
+    {ico:"✅",n:s.functional,  lbl:"Functional",        bar:"#22c55e",nav:"equipment"},
+    {ico:"⚠️",n:s.overdue,    lbl:"Maint. Overdue",   bar:"#ef4444",nav:"maintenance"},
+    {ico:"⏰",n:s.calOverdue,  lbl:"Cal. Overdue",     bar:"#b45309",nav:"maintenance"},
+  ];
+  const recent=[...STATE.equipment].sort((a,b)=>new Date(b.last_updated)-new Date(a.last_updated)).slice(0,3);
+  return '<div class="screen">'+
+    '<div class="page-hero"><h1>🏥 '+esc(STATE.settings.hospitalName)+'</h1><p>Medical Equipment Management</p>'+(STATE.offline?'<div style="margin-top:8px;background:rgba(255,255,255,.2);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;display:inline-block">⚠️ Offline/Demo Mode</div>':'<div style="margin-top:8px;background:rgba(255,255,255,.15);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;display:inline-block">🟢 Live — Synced across devices</div>')+'</div>'+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:16px">'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+tiles.map(t=>'<div class="tile" data-nav="'+esc(t.nav)+'"><div style="font-size:26px;margin-bottom:8px">'+t.ico+'</div><div style="font-size:32px;font-weight:900;color:var(--text);line-height:1">'+t.n+'</div><div style="font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--sub);text-transform:uppercase;margin-top:6px">'+esc(t.lbl)+'</div><div class="tile-bar" style="background:'+t.bar+'"></div></div>').join("")+'</div>'+
+    '<div><p class="sec-lbl" style="margin-bottom:10px">Quick Actions</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<button class="btn btn-teal" data-nav="equipment" style="justify-content:flex-start">📋 View All Equipment</button>'+
+    '<button class="btn btn-outline" data-nav="maintenance" style="justify-content:flex-start">🔧 Maintenance Tracker</button>'+
+    '<button class="btn btn-outline" data-nav="reports" style="justify-content:flex-start">📊 Reports & Analytics</button>'+
+    '</div></div>'+
+    '<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><p class="sec-lbl">Recent Updates</p><button class="lnk" data-nav="equipment">See All →</button></div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px">'+recent.map(eqCardHTML).join("")+'</div></div></div>'+
+    '<style>.lnk{background:none;border:none;color:var(--teal);font-weight:700;font-size:13px;cursor:pointer;font-family:Nunito,sans-serif}</style></div>';
+}
+
+/* ─── EQUIPMENT CARD ─────────────────────────────── */
+function eqCardHTML(e){
+  const diff=daysDiff(e.next_maintenance);
+  const sc=STATUS_CFG[e.status]||{label:e.status,bg:"#94a3b8",text:"#fff",icon:"?"};
+  const maintPill=diff<0
+    ?'<span style="font-size:11px;font-weight:700;color:var(--red);background:var(--red-lt);padding:3px 8px;border-radius:99px;white-space:nowrap">⚠️ '+Math.abs(diff)+'d OD</span>'
+    :diff<=30
+      ?'<span style="font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-lt);padding:3px 8px;border-radius:99px;white-space:nowrap">🕐 '+diff+'d left</span>'
+      :'<span style="font-size:11px;color:var(--sub);white-space:nowrap">'+fmtDate(e.next_maintenance)+'</span>';
+  return '<div class="eq-card" data-eq-id="'+esc(e.id)+'" style="border-left-color:'+sc.bg+'">'+
+    '<div style="font-weight:800;font-size:15px;color:var(--text);line-height:1.3;margin-bottom:10px">'+esc(e.name)+'</div>'+
+    // ── TWO CLEARLY LABELLED STATUS ROWS ──────────────────────────────────
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:130px">'+
+        '<span class="status-label">⚙️ Functional Status</span>'+
+        funcBadge(e.status)+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:130px">'+
+        '<span class="status-label">⏰ Calibration Status</span>'+
+        calBadge(e)+
+      '</div>'+
+    '</div>'+
+    // ── META ───────────────────────────────────────────────────────────────
+    '<div style="font-size:12px;color:var(--sub);margin-bottom:8px">'+esc(e.category)+' · SN: '+esc(e.serial_number)+(e.maintenance_interval&&e.maintenance_interval!=='0'?' · 🔄 '+recurrenceLabel(e.maintenance_interval):'')+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center">'+
+      '<span style="font-size:13px;color:var(--sub)">📍 '+esc(e.location)+'</span>'+maintPill+
+    '</div>'+
+    '<div style="margin-top:8px;font-size:11px;color:'+(isAdmin()?"var(--teal)":"var(--sub)")+';font-weight:600">'+
+      (isAdmin()?"✏️ Tap to edit":"Tap to view details →")+
+    '</div>'+
+  '</div>';
+}
+
+/* ─── EQUIPMENT TAB ──────────────────────────────── */
+function renderEquipment(){
+  const q=STATE.search.trim().toLowerCase();
+  const filt=q?STATE.equipment.filter(e=>[e.name,e.category,e.location,e.serial_number].join(" ").toLowerCase().includes(q)):STATE.equipment;
+  const display=STATE.showAll?filt:filt.slice(0,6);
+  return '<div class="screen">'+
+    '<div class="page-hero"><h1>📋 Equipment</h1><p>'+STATE.equipment.length+' items registered</p></div>'+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:14px">'+
+    (isAdmin()
+      ?'<button class="btn btn-teal" id="btn-add-eq">➕ Add New Equipment</button>'
+      :'<div class="ro-notice"><span style="font-size:20px">👁</span><div><div style="font-weight:700;color:var(--text);font-size:13px">Read-Only View</div><div style="font-size:12px;margin-top:1px">Tap any item for details. <button id="btn-admin-login-eq" style="background:none;border:none;color:var(--teal);font-weight:700;cursor:pointer;font-family:Nunito,sans-serif;font-size:12px;padding:0">Login</button> to add/edit (Admin or Engineer).</div></div></div>')+
+    '<div class="search-wrap"><input class="inp" id="eq-search" type="search" placeholder="Search name, category, location…" value="'+esc(STATE.search)+'" autocomplete="off" maxlength="100"/></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center"><p class="sec-lbl">'+( STATE.showAll?"All":"Recent")+" ("+filt.length+")</p><button class=\"lnk\" id=\"btn-view-all\">"+(STATE.showAll?"Collapse ↑":"View All →")+'</button></div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px">'+
+    (display.length?display.map(eqCardHTML).join(""):'<p style="color:var(--sub);text-align:center;padding:28px">No equipment found.</p>')+
+    '</div>'+
+    (!STATE.showAll&&filt.length>6?'<button class="btn btn-ghost" id="btn-load-all">Load all '+filt.length+' items</button>':'')+
+    '</div>'+
+    '<style>.lnk{background:none;border:none;color:var(--teal);font-weight:700;font-size:13px;cursor:pointer;font-family:Nunito,sans-serif}</style></div>';
+}
+
+/* ─── EQUIPMENT DETAIL (read-only) ──────────────── */
+function renderDetail(){
+  const e=STATE.detail;if(!e)return"";
+  const sc=STATUS_CFG[e.status]||{label:e.status,bg:"#94a3b8",text:"#fff",icon:"?"};
+  const diff=daysDiff(e.next_maintenance);
+  const maintSt=diff<0?{txt:"Overdue by "+Math.abs(diff)+"d",color:"var(--red)",bg:"var(--red-lt)"}:diff<=30?{txt:"Due in "+diff+"d",color:"var(--amber)",bg:"var(--amber-lt)"}:{txt:"On schedule",color:"var(--green-dk)",bg:"var(--green-lt)"};
+  const calRequired=e.calibration_status==="cal_required";
+  const calDiff=calRequired&&e.next_calibration?daysDiff(e.next_calibration):null;
+  const calSt=calDiff===null?null:calDiff<0?{txt:"Overdue by "+Math.abs(calDiff)+"d",color:"#b45309",bg:"#fef3c7"}:calDiff<=30?{txt:"Due in "+calDiff+"d",color:"#d97706",bg:"#fef3c7"}:{txt:"On schedule",color:"var(--green-dk)",bg:"var(--green-lt)"};
+
+  const infoRows=[
+    {ico:"🏷️",bg:"#eff6ff",label:"Category",          value:e.category},
+    {ico:"🔢",bg:"#faf5ff",label:"Serial / Asset No.", value:e.serial_number},
+    {ico:"📍",bg:"#fff5f5",label:"Location",           value:e.location},
+    {ico:"📅",bg:"#fffbeb",label:"Next Maintenance",   value:fmtDate(e.next_maintenance)},
+    {ico:"🔄",bg:"#f0f9ff",label:"Maintenance Recurrence",value:recurrenceLabel(e.maintenance_interval||"90")},
+    {ico:"🕐",bg:maintSt.bg,label:"Maintenance Status",value:maintSt.txt,vc:maintSt.color},
+    {ico:"⏰",bg:calRequired?"#fef3c7":"#f8fafc",label:"Calibration Status",
+      value:calRequired?"Calibration Required":"Calibration Not Required",vc:calRequired?"#b45309":"var(--sub)"},
+    ...(calRequired&&e.last_calibration?[{ico:"🔬",bg:"#f0fdf4",label:"Last Calibration",value:fmtDate(e.last_calibration)}]:[]),
+    ...(calRequired&&e.next_calibration?[{ico:"📆",bg:calSt?.bg||"#f8fafc",label:"Next Calibration",value:fmtDate(e.next_calibration),vc:calSt?.color}]:[]),
+    ...(calSt?[{ico:"📊",bg:calSt.bg,label:"Calibration Alert",value:calSt.txt,vc:calSt.color}]:[]),
+    {ico:"📝",bg:"#f8fafc",label:"Notes",value:e.notes||"—"},
+    {ico:"🔄",bg:"#f0fdf4",label:"Last Updated",value:fmtDate(e.last_updated)},
+  ];
+
+  return '<div class="fullscreen" role="dialog" aria-modal="true">'+
+    '<div class="fs-header"><button class="fs-back" id="btn-close-detail">← Back</button><span style="font-weight:800;font-size:16px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.name)+'</span></div>'+
+    // Hero with BOTH statuses
+    '<div style="background:linear-gradient(135deg,'+sc.bg+' 0%,'+sc.bg+'cc 100%);padding:22px 18px;display:flex;flex-direction:column;gap:12px">'+
+      '<div style="display:flex;align-items:center;gap:14px">'+
+        '<div style="width:50px;height:50px;border-radius:14px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">'+sc.icon+'</div>'+
+        '<h2 style="font-size:18px;font-weight:900;color:#fff;line-height:1.2">'+esc(e.name)+'</h2>'+
+      '</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+          '<span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.8px">⚙️ Functional Status</span>'+
+          '<span class="badge" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.35)">'+sc.icon+' '+esc(sc.label)+'</span>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+          '<span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.8px">⏰ Calibration Status</span>'+
+          (calRequired
+            ?(calSt&&calSt.txt.includes("Overdue")?'<span class="badge" style="background:#b45309;color:#fff">⏰ '+esc(calSt.txt)+'</span>'
+              :calSt&&calSt.txt.includes("Due in")?'<span class="badge" style="background:#d97706;color:#fff">🔧 '+esc(calSt.txt)+'</span>'
+              :'<span class="badge" style="background:rgba(245,158,11,.85);color:#fff">🔧 Cal Required</span>')
+            :'<span class="badge" style="background:rgba(255,255,255,.15);color:rgba(255,255,255,.85)">— Not Required</span>')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:16px">'+
+      '<div class="card" style="padding:16px">'+
+        infoRows.map(r=>'<div class="info-row"><div class="info-icon" style="background:'+r.bg+'">'+r.ico+'</div><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px">'+esc(r.label)+'</div><div style="font-size:14px;font-weight:700;color:'+(r.vc||"var(--text)")+'">'+esc(String(r.value))+'</div></div></div>').join("")+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:8px">'+
+        (canEdit()
+          ?'<button class="btn btn-teal" id="btn-detail-edit">✏️ Edit Equipment</button>'+(isAdmin()?'<button class="btn btn-outline" id="btn-detail-delete" style="color:var(--red);border-color:var(--red)">🗑 Delete Equipment</button>':'')
+          :'<div class="ro-notice"><span>🔐</span><span>Login as Admin or Engineer to edit.</span></div>')+
+        '<button class="btn btn-ghost" id="btn-detail-qr">📱 Generate QR Code</button>'+
+        '<button class="btn btn-ghost" id="btn-detail-history">📋 Service History</button>'+
+        '<button class="btn btn-outline" id="btn-close-detail-2">Close</button>'+
+      '</div>'+
+    '</div></div>';
+}
+
+/* ─── MAINTENANCE TAB ────────────────────────────── */
+function renderMaintenance(){
+  const s=getStats();const admin=isAdmin();
+  function maintCard(e,isOverdue){
+    const diff=isOverdue?Math.abs(daysDiff(e.next_maintenance)):daysDiff(e.next_maintenance);
+    const sc=STATUS_CFG[e.status]||{label:e.status,bg:"#94a3b8",text:"#fff",icon:"?"};
+    const cls=isOverdue?"mcard-red":"mcard-amb";
+    const pill=isOverdue
+      ?'<span style="font-size:11px;font-weight:800;color:var(--red);background:var(--red-lt);padding:3px 8px;border-radius:99px">⚠️ '+diff+'d overdue</span>'
+      :'<span style="font-size:11px;font-weight:800;color:var(--amber);background:var(--amber-lt);padding:3px 8px;border-radius:99px">🕐 '+diff+'d left</span>';
+    const btnColor=isOverdue?"btn-red":"btn-amber";
+    return '<div class="'+cls+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px"><span style="font-weight:800;color:var(--text);font-size:15px">'+esc(e.name)+'</span>'+pill+'</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+
+        '<div style="display:flex;flex-direction:column;gap:2px">'+
+          '<span class="status-label">⚙️ Functional</span>'+
+          '<span class="badge" style="background:'+sc.bg+';color:'+sc.text+';font-size:10px">'+sc.icon+' '+esc(sc.label)+'</span>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:2px">'+
+          '<span class="status-label">⏰ Calibration</span>'+
+          calBadge(e)+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--sub);margin-bottom:8px">📍 '+esc(e.location)+' · '+(isOverdue?"Was: ":"Due: ")+fmtDate(e.next_maintenance)+'</div>'+
+      (admin
+        ?'<button class="btn '+btnColor+' btn-mark-done" data-id="'+esc(e.id)+'" style="font-size:13px;padding:10px">✓ Mark Maintenance Done (+90 days)</button>'
+        :'<div class="ro-notice">🔒 Admin required to update</div>')+
+    '</div>';
+  }
+  function calCard(e,isOverdue){
+    const diff=isOverdue?Math.abs(daysDiff(e.next_calibration)):daysDiff(e.next_calibration);
+    const sc=STATUS_CFG[e.status]||{label:e.status,bg:"#94a3b8",text:"#fff",icon:"?"};
+    const cls=isOverdue?"mcard-red":"mcard-amb";
+    const pill=isOverdue
+      ?'<span style="font-size:11px;font-weight:800;color:#b45309;background:#fef3c7;padding:3px 8px;border-radius:99px">⏰ '+diff+'d overdue</span>'
+      :'<span style="font-size:11px;font-weight:800;color:#d97706;background:#fef3c7;padding:3px 8px;border-radius:99px">🔧 '+diff+'d left</span>';
+    return '<div class="'+cls+'" style="border-color:'+(isOverdue?"#b45309":"#d97706")+';background:'+(isOverdue?"#fefce8":"#fffbeb")+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px"><span style="font-weight:800;color:var(--text);font-size:15px">'+esc(e.name)+'</span>'+pill+'</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+
+        '<div style="display:flex;flex-direction:column;gap:2px">'+
+          '<span class="status-label">⚙️ Functional</span>'+
+          '<span class="badge" style="background:'+sc.bg+';color:'+sc.text+';font-size:10px">'+sc.icon+' '+esc(sc.label)+'</span>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:2px">'+
+          '<span class="status-label">⏰ Calibration</span>'+
+          calBadge(e)+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--sub);margin-bottom:8px">📍 '+esc(e.location)+' · Last cal: '+fmtDate(e.last_calibration)+' · Due: '+fmtDate(e.next_calibration)+'</div>'+
+      (admin
+        ?'<button class="btn btn-mark-cal-done" data-id="'+esc(e.id)+'" style="font-size:13px;padding:10px;background:'+(isOverdue?"#b45309":"#d97706")+';color:#fff;border:none;border-radius:12px;cursor:pointer;font-family:Nunito,sans-serif;font-weight:700;width:100%;display:flex;align-items:center;justify-content:center;gap:6px">⏰ Mark Calibration Done (+1 year)</button>'
+        :'<div class="ro-notice">🔒 Admin required to update</div>')+
+    '</div>';
+  }
+
+  const overdueHTML=s.overdueList.length?s.overdueList.map(e=>maintCard(e,true)).join(""):'<div class="mcard-grn">🎉 No maintenance overdue!</div>';
+  const upcomingHTML=s.upcoming.length?s.upcoming.map(e=>maintCard(e,false)).join(""):'<p style="color:var(--sub);font-size:14px;padding:6px 0">No maintenance due in 30 days.</p>';
+  const calOverdueHTML=s.calOverdueList.length?s.calOverdueList.map(e=>calCard(e,true)).join(""):'<div class="mcard-grn">✅ No calibration overdue!</div>';
+  const calUpcomingHTML=s.calUpcomingList.length?s.calUpcomingList.map(e=>calCard(e,false)).join(""):'<p style="color:var(--sub);font-size:14px;padding:6px 0">No calibrations due in 30 days.</p>';
+
+  return '<div class="screen">'+
+    '<div class="page-hero"><h1>🔧 Maintenance & Calibration</h1><p>'+s.overdueList.length+' maint. overdue · '+s.calOverdueList.length+' cal. overdue</p></div>'+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:14px">'+
+    (!admin?'<div class="ro-notice" style="border-color:var(--teal-mid)"><span style="font-size:18px">🔐</span><div><div style="font-weight:700;color:var(--text);font-size:13px">Read-Only</div><div style="font-size:12px">Login as admin to mark done.</div></div></div>':"")+
+    '<div class="card" style="padding:16px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:32px;height:32px;border-radius:10px;background:var(--red-lt);display:flex;align-items:center;justify-content:center;font-size:16px">🔧</div><p style="font-size:14px;font-weight:900;color:var(--text)">Maintenance</p></div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:8px;height:8px;border-radius:50%;background:var(--red)"></div><p class="sec-lbl" style="color:var(--red)">Overdue ('+s.overdueList.length+')</p></div>'+
+      '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">'+overdueHTML+'</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:8px;height:8px;border-radius:50%;background:var(--amber)"></div><p class="sec-lbl" style="color:var(--amber)">Upcoming 30d ('+s.upcoming.length+')</p></div>'+
+      '<div style="display:flex;flex-direction:column;gap:10px">'+upcomingHTML+'</div>'+
+    '</div>'+
+    '<div class="card" style="padding:16px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:32px;height:32px;border-radius:10px;background:#fef3c7;display:flex;align-items:center;justify-content:center;font-size:16px">⏰</div><p style="font-size:14px;font-weight:900;color:var(--text)">Calibration</p></div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:8px;height:8px;border-radius:50%;background:#b45309"></div><p class="sec-lbl" style="color:#b45309">Overdue ('+s.calOverdueList.length+')</p></div>'+
+      '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">'+calOverdueHTML+'</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:8px;height:8px;border-radius:50%;background:#d97706"></div><p class="sec-lbl" style="color:#d97706">Upcoming 30d ('+s.calUpcomingList.length+')</p></div>'+
+      '<div style="display:flex;flex-direction:column;gap:10px">'+calUpcomingHTML+'</div>'+
+    '</div>'+
+    '</div></div>';
+}
+
+/* ─── REPORTS TAB ────────────────────────────────── */
+function renderReports(){
+  const s=getStats();
+  const types=[
+    {id:"status",   ico:"📊",title:"Equipment Status",     desc:"Functional & calibration breakdown", accent:"var(--blue)"},
+    {id:"maintenance",ico:"🔧",title:"Maintenance Schedule",desc:"Overdue and upcoming maintenance",   accent:"var(--red)"},
+    {id:"location", ico:"📍",title:"By Location",           desc:"Distribution across locations",      accent:"var(--teal)"},
+    {id:"category", ico:"🏷️",title:"By Equipment Type",     desc:"Distribution by category",           accent:"var(--amber)"},
+  ];
+  return '<div class="screen">'+
+    '<div class="page-hero"><h1>📊 Reports</h1><p>Analytics and inventory reports</p></div>'+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
+    [{label:"Total",n:s.total,c:"var(--blue)"},{label:"Functional",n:s.functional,c:"var(--green)"},{label:"Maint OD",n:s.overdue,c:"var(--red)"},{label:"Cal OD",n:s.calOverdue,c:"#b45309"}].map(x=>'<div class="card" style="padding:10px 6px;text-align:center"><div style="font-size:18px;font-weight:900;color:'+x.c+'">'+x.n+'</div><div style="font-size:9px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;line-height:1.2">'+x.label+'</div></div>').join("")+
+    '</div>'+
+    '<p class="sec-lbl" style="margin-top:4px">Select Report Type</p>'+
+    types.map(r=>'<div class="report-row" data-report="'+esc(r.id)+'" style="border-left:4px solid '+r.accent+'"><div style="width:42px;height:42px;border-radius:12px;background:var(--teal-lt);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">'+r.ico+'</div><div style="flex:1"><div style="font-weight:800;font-size:15px;color:var(--text)">'+esc(r.title)+'</div><div style="font-size:12px;color:var(--sub);margin-top:2px">'+esc(r.desc)+'</div></div><span style="color:var(--teal);font-size:20px;font-weight:700">›</span></div>').join("")+
+    '</div></div>';
+}
+
+/* ─── REPORT DETAIL ──────────────────────────────── */
+function renderReportDetail(){
+  const TITLES={status:"Equipment Status",maintenance:"Maintenance Schedule",location:"By Location",category:"By Type"};
+  const eq=STATE.equipment,total=eq.length||1;
+  let rows=[],thead=["Item","Count","%"];
+  if(STATE.report==="status"){
+    const c={};eq.forEach(e=>{c[e.status]=(c[e.status]||0)+1;});
+    rows=Object.entries(c).map(([k,v])=>[STATUS_CFG[k]?.label||k,v,((v/total)*100).toFixed(1)+"%"]);
+    thead=["Functional Status","Count","%"];
+  }else if(STATE.report==="maintenance"){
+    thead=["Equipment","Due Date","Days"];
+    rows=[...eq].sort((a,b)=>new Date(a.next_maintenance)-new Date(b.next_maintenance)).map(e=>{const d=daysDiff(e.next_maintenance);return[e.name,fmtDate(e.next_maintenance),d<0?"⚠️ "+Math.abs(d)+"d OD":"✓ "+d+"d"];});
+  }else if(STATE.report==="location"){
+    const c={};eq.forEach(e=>{c[e.location]=(c[e.location]||0)+1;});
+    rows=Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,v,((v/total)*100).toFixed(1)+"%"]);
+    thead=["Location","Count","%"];
+  }else{
+    const c={};eq.forEach(e=>{c[e.category]=(c[e.category]||0)+1;});
+    rows=Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,v,((v/total)*100).toFixed(1)+"%"]);
+    thead=["Category","Count","%"];
+  }
+  const isMaint=STATE.report==="maintenance";
+  const tRows=rows.map((r,ri)=>'<tr style="background:'+(ri%2===0?"#fff":"#f9fbfc")+'">'
+    +r.map((c,ci)=>'<td style="padding:11px 14px;font-size:13px;color:'+(ci===0?"var(--text)":"var(--sub)")+';font-weight:'+(ci===0?700:500)+';text-align:'+(ci===0?"left":"center")+';border-bottom:1px solid var(--border)">'+esc(String(c))+'</td>').join("")
+  +'</tr>').join("");
+
+  return '<div class="fullscreen" role="dialog" aria-modal="true">'+
+    '<div class="fs-header"><button class="fs-back" id="btn-close-report">← Back</button><span style="font-weight:900;font-size:16px;color:var(--text)">'+esc(TITLES[STATE.report])+'</span></div>'+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:14px;padding-bottom:32px">'+
+    '<div class="card" style="padding:18px">'+
+      '<h3 style="font-weight:900;font-size:15px;color:var(--text);margin-bottom:4px">Distribution Chart</h3>'+
+      '<p style="font-size:11px;color:var(--sub);margin-bottom:16px">'+(isMaint?"Timeline view":"Tap a segment for details")+'</p>'+
+      '<div style="position:relative;height:240px;width:100%"><canvas id="report-chart"></canvas></div>'+
+      '<div id="chart-legend" style="margin-top:16px;display:flex;flex-direction:column;gap:2px"></div>'+
+    '</div>'+
+    '<div class="card" style="padding:0;overflow:hidden">'+
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--border)"><h3 style="font-weight:900;font-size:15px;color:var(--text)">Data Table</h3></div>'+
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:260px">'+
+        '<thead><tr style="background:var(--teal-lt)">'+thead.map((h,i)=>'<th style="padding:10px 14px;font-size:10px;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:.6px;text-align:'+(i===0?"left":"center")+';border-bottom:2px solid var(--border)">'+esc(h)+'</th>').join("")+'</tr></thead>'+
+        '<tbody>'+tRows+'</tbody>'+
+        (!isMaint?'<tfoot><tr style="background:var(--teal-lt)"><td style="padding:10px 14px;font-size:12px;font-weight:800;color:var(--teal)">TOTAL</td><td style="padding:10px 14px;font-size:12px;font-weight:800;color:var(--teal);text-align:center">'+total+'</td><td style="padding:10px 14px;font-size:12px;font-weight:800;color:var(--teal);text-align:center">100%</td></tr></tfoot>':"")+
+      '</table></div>'+
+    '</div>'+
+    '<div class="card" style="padding:14px">'+
+      '<p class="sec-lbl" style="margin-bottom:10px">Export Report</p>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+
+        '<button class="btn" id="exp-csv" style="background:#f0f9ff;color:#0369a1;font-size:12px;padding:10px 6px;border-radius:10px;flex-direction:column;gap:2px"><span style="font-size:20px">📄</span><span>CSV</span></button>'+
+        '<button class="btn" id="exp-xlsx" style="background:#f0fdf4;color:#166534;font-size:12px;padding:10px 6px;border-radius:10px;flex-direction:column;gap:2px"><span style="font-size:20px">📊</span><span>Excel</span></button>'+
+        '<button class="btn" id="exp-pdf" style="background:#fff5f5;color:#991b1b;font-size:12px;padding:10px 6px;border-radius:10px;flex-direction:column;gap:2px"><span style="font-size:20px">📕</span><span>PDF</span></button>'+
+      '</div>'+
+    '</div>'+
+    '</div></div>';
+}
+
+/* ─── CHART ──────────────────────────────────────── */
+function renderChart(){
+  const canvas=document.getElementById("report-chart");if(!canvas)return;
+  const legEl=document.getElementById("chart-legend");
+  if(typeof Chart==="undefined"){if(legEl)legEl.innerHTML='<p style="text-align:center;color:var(--sub);font-size:13px">⚠️ Chart library not loaded. Check your connection.</p>';return;}
+  if(STATE.chartInst){STATE.chartInst.destroy();STATE.chartInst=null;}
+  const eq=STATE.equipment,total=eq.length||1;
+  let labels=[],data=[],colors=[];
+  const isMaint=STATE.report==="maintenance";
+  if(STATE.report==="status"){
+    const c={};eq.forEach(e=>{c[e.status]=(c[e.status]||0)+1;});
+    Object.entries(c).forEach(([k,v],i)=>{labels.push(STATUS_CFG[k]?.label||k);data.push(v);colors.push(STATUS_CFG[k]?.bg||CHART_PAL[i%CHART_PAL.length]);});
+  }else if(STATE.report==="location"){
+    const c={};eq.forEach(e=>{c[e.location]=(c[e.location]||0)+1;});
+    Object.entries(c).sort((a,b)=>b[1]-a[1]).forEach(([k,v],i)=>{labels.push(k);data.push(v);colors.push(CHART_PAL[i%CHART_PAL.length]);});
+  }else if(STATE.report==="category"){
+    const c={};eq.forEach(e=>{c[e.category]=(c[e.category]||0)+1;});
+    Object.entries(c).sort((a,b)=>b[1]-a[1]).forEach(([k,v],i)=>{labels.push(k);data.push(v);colors.push(CHART_PAL[i%CHART_PAL.length]);});
+  }else{
+    const ov=eq.filter(e=>daysDiff(e.next_maintenance)<0).length,up=eq.filter(e=>{const d=daysDiff(e.next_maintenance);return d>=0&&d<=30;}).length,ok=eq.length-ov-up;
+    labels=["Overdue","Upcoming 30d","On Schedule"];data=[ov,up,ok];colors=["#ef4444","#f59e0b","#22c55e"];
+  }
+  const pct=v=>((v/total)*100).toFixed(1)+"%";
+  STATE.chartInst=new Chart(canvas,{
+    type:isMaint?"bar":"doughnut",
+    data:{labels,datasets:[{data,backgroundColor:isMaint?colors.map(c=>c+"cc"):colors,borderColor:"#fff",borderWidth:isMaint?0:3,hoverOffset:isMaint?0:10,borderRadius:isMaint?8:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:isMaint?undefined:"58%",
+      plugins:{legend:{display:false},tooltip:{backgroundColor:"rgba(15,23,42,.9)",titleFont:{family:"Nunito",size:13,weight:"800"},bodyFont:{family:"Nunito",size:12},padding:12,cornerRadius:10,
+        callbacks:{label:ctx=>" "+(isMaint?ctx.raw:ctx.parsed)+" item"+((isMaint?ctx.raw:ctx.parsed)!==1?"s":"")+" — "+pct(isMaint?ctx.raw:ctx.parsed)}}},
+      scales:isMaint?{y:{beginAtZero:true,ticks:{font:{family:"Nunito",size:11},stepSize:1},grid:{color:"rgba(0,0,0,.05)"}},x:{ticks:{font:{family:"Nunito",size:11}},grid:{display:false}}}:undefined},
+  });
+  if(legEl){
+    legEl.innerHTML='<div style="display:flex;justify-content:space-between;padding:0 10px 6px;border-bottom:1px solid var(--border);margin-bottom:4px"><span style="font-size:9px;font-weight:800;color:var(--sub);text-transform:uppercase">Category</span><div style="display:flex;gap:16px"><span style="font-size:9px;font-weight:800;color:var(--sub);text-transform:uppercase">Count</span><span style="font-size:9px;font-weight:800;color:var(--sub);text-transform:uppercase">Share</span></div></div>'+
+    labels.map((lbl,i)=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;background:'+(i%2===0?"#f8fafc":"#fff")+'"><div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0"><div style="width:12px;height:12px;border-radius:3px;background:'+colors[i]+';flex-shrink:0"></div><span style="font-size:12.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(lbl)+'</span></div><div style="display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="font-size:14px;font-weight:900;color:var(--text)">'+data[i]+'</span><span style="font-size:11px;font-weight:700;color:'+colors[i]+';background:'+colors[i]+'1a;padding:3px 8px;border-radius:99px">'+pct(data[i])+'</span></div></div>').join("");
+  }
+}
+
+/* ─── SETTINGS TAB ───────────────────────────────── */
+function renderSettings(){
+  if(!isAdmin()){
+    return '<div class="screen"><div class="page-hero"><h1>⚙️ Settings</h1><p>Admin access required</p></div>'+
+      '<div style="padding:16px"><div class="card" style="padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px">'+
+        '<div style="width:72px;height:72px;border-radius:20px;background:var(--teal-lt);display:flex;align-items:center;justify-content:center;font-size:36px">🔐</div>'+
+        '<h2 style="font-weight:900;color:var(--text);font-size:18px">Admin Access Required</h2>'+
+        '<p style="color:var(--sub);font-size:13px;line-height:1.6">Settings are restricted to authorised administrators.</p>'+
+        '<button class="btn btn-teal" id="btn-open-settings-login" style="max-width:220px">Login as Admin</button>'+
+      '</div></div></div>';
+  }
+  const s=STATE.settings;
+  const cats=s.categories||DEFAULT_CATEGORIES;
+  const locs=s.locations||DEFAULT_LOCATIONS;
+  return '<div class="screen"><div class="page-hero"><h1>⚙️ Settings</h1><p>Admin: '+esc(STATE.adminEmail)+'</p></div>'+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'+
+
+    // Session card
+    '<div style="background:var(--green-lt);border:1.5px solid var(--green);border-radius:14px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'+
+      '<div><div style="font-size:13px;font-weight:700;color:var(--green-dk)">🟢 Role: '+esc(STATE.verifiedRole||"viewer")+' — Session Active</div><div style="font-size:12px;color:var(--sub);margin-top:2px">'+esc(STATE.adminEmail)+'</div></div>'+
+      '<button id="btn-logout" class="btn" style="width:auto;padding:8px 14px;background:var(--red-lt);color:var(--red);font-size:13px;border-radius:10px">Logout</button>'+
+    '</div>'+
+
+    // Hospital
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">'+
+      '<p class="sec-lbl">🏥 Hospital</p>'+
+      '<label style="font-size:12px;font-weight:700;color:var(--sub)">Hospital Name</label>'+
+      '<input class="inp" id="inp-hospital-name" value="'+esc(s.hospitalName)+'" maxlength="80"/>'+
+      '<button class="btn btn-teal" id="btn-save-hospital" style="padding:10px">💾 Save Name</button>'+
+    '</div>'+
+
+    // Notifications
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px">'+
+      '<p class="sec-lbl">🔔 Notifications</p>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div><div style="font-weight:700;color:var(--text);font-size:14px">Maintenance Reminders</div><div style="font-size:11px;color:var(--sub);margin-top:2px">Alert when maintenance is due</div></div>'+
+        '<div class="toggle" id="toggle-reminders" style="background:'+(s.reminders?"var(--teal)":"var(--border)")+'"><div class="toggle-thumb" style="left:'+(s.reminders?"24px":"3px")+'"></div></div>'+
+      '</div>'+
+      '<label style="font-size:12px;font-weight:700;color:var(--sub)">Calibration Reminder Threshold (days)</label>'+
+      '<input class="inp" id="inp-cal-threshold" type="number" value="'+s.calThreshold+'" min="1" max="365"/>'+
+      '<button class="btn btn-teal" id="btn-save-notif" style="padding:10px">💾 Save Preferences</button>'+
+    '</div>'+
+
+    // Dropdown list manager
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:14px">'+
+      '<p class="sec-lbl">📝 Dropdown List Manager</p>'+
+      '<p style="font-size:12px;color:var(--sub);line-height:1.6">Edit categories and locations shown in the Add/Edit Equipment form.</p>'+
+      // Categories
+      '<div style="display:flex;flex-direction:column;gap:8px">'+
+        '<div style="font-size:12px;font-weight:800;color:var(--text)">🏷️ Equipment Categories</div>'+
+        '<div id="cat-list" style="display:flex;flex-direction:column;gap:6px">'+
+          cats.map((c,i)=>'<div style="display:flex;gap:8px;align-items:center"><input class="inp cat-item" data-idx="'+i+'" value="'+esc(c)+'" style="flex:1;padding:9px 11px;font-size:13px" maxlength="60"/><button class="btn-del-cat" data-idx="'+i+'" style="background:var(--red-lt);border:none;color:var(--red);border-radius:9px;width:34px;height:34px;cursor:pointer;font-size:16px;flex-shrink:0">🗑</button></div>').join("")+
+        '</div>'+
+        '<button class="btn btn-ghost" id="btn-add-cat" style="padding:8px;font-size:13px">+ Add Category</button>'+
+        '<button class="btn btn-teal" id="btn-save-cats" style="padding:9px;font-size:13px">💾 Save Categories</button>'+
+      '</div>'+
+      '<div style="height:1px;background:var(--border)"></div>'+
+      // Locations
+      '<div style="display:flex;flex-direction:column;gap:8px">'+
+        '<div style="font-size:12px;font-weight:800;color:var(--text)">📍 Locations / Units</div>'+
+        '<div id="loc-list" style="display:flex;flex-direction:column;gap:6px">'+
+          locs.map((l,i)=>'<div style="display:flex;gap:8px;align-items:center"><input class="inp loc-item" data-idx="'+i+'" value="'+esc(l)+'" style="flex:1;padding:9px 11px;font-size:13px" maxlength="60"/><button class="btn-del-loc" data-idx="'+i+'" style="background:var(--red-lt);border:none;color:var(--red);border-radius:9px;width:34px;height:34px;cursor:pointer;font-size:16px;flex-shrink:0">🗑</button></div>').join("")+
+        '</div>'+
+        '<button class="btn btn-ghost" id="btn-add-loc" style="padding:8px;font-size:13px">+ Add Location</button>'+
+        '<button class="btn btn-teal" id="btn-save-locs" style="padding:9px;font-size:13px">💾 Save Locations</button>'+
+      '</div>'+
+    '</div>'+
+
+    // Bulk upload
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">'+
+      '<p class="sec-lbl">📥 Bulk Equipment Upload</p>'+
+      '<p style="font-size:12px;color:var(--sub);line-height:1.6">Upload multiple equipment items from an Excel file. Download the template, fill it in, then upload — items are validated row-by-row before import.</p>'+
+      '<button class="btn btn-teal" id="btn-open-bulk" style="padding:11px">📥 Open Bulk Upload</button>'+
+    '</div>'+
+
+    // Export
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:9px">'+
+      '<p class="sec-lbl">📤 Export All Data</p>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+
+        '<button class="btn" id="exp-csv-s" style="background:#f0f9ff;color:#0369a1;font-size:12px;padding:12px 6px;border-radius:10px;flex-direction:column;gap:2px"><span style="font-size:22px">📄</span><span>CSV</span></button>'+
+        '<button class="btn" id="exp-xlsx-s" style="background:#f0fdf4;color:#166534;font-size:12px;padding:12px 6px;border-radius:10px;flex-direction:column;gap:2px"><span style="font-size:22px">📊</span><span>Excel</span></button>'+
+        '<button class="btn" id="exp-pdf-s" style="background:#fff5f5;color:#991b1b;font-size:12px;padding:12px 6px;border-radius:10px;flex-direction:column;gap:2px"><span style="font-size:22px">📕</span><span>PDF</span></button>'+
+      '</div>'+
+    '</div>'+
+
+    // Audit log
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">'+
+      '<p class="sec-lbl">🔍 Audit Log</p>'+
+      '<p style="font-size:12px;color:var(--sub);line-height:1.6">Every create, edit, and delete is recorded automatically. Full traceability for medical compliance.</p>'+
+      '<button class="btn btn-ghost" id="btn-view-audit" style="padding:9px">📋 View Audit Log</button>'+
+    '</div>'+
+
+    // DB setup + Step-by-step guide
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">'+
+      '<p class="sec-lbl">🗄️ Database Setup</p>'+
+      '<p style="font-size:12px;color:var(--sub);line-height:1.6">Run the setup SQL <strong>once</strong> in your Supabase SQL Editor to set up all tables, roles, and audit logging.</p>'+
+      '<button class="btn btn-ghost" id="btn-show-sql" style="padding:9px">📋 View Full Setup SQL</button>'+
+      '<button class="btn btn-ghost" id="btn-show-guide" style="padding:9px">📖 Step-by-Step Setup Guide</button>'+
+    '</div>'+
+
+    // Danger
+    '<div class="card" style="padding:16px">'+
+      '<p class="sec-lbl" style="margin-bottom:10px">⚠️ Danger Zone</p>'+
+      '<button class="btn btn-outline" id="btn-reset-data" style="color:var(--red);border-color:var(--red)">🔄 Reset to Sample Data</button>'+
+    '</div>'+
+
+    // Security status card
+    '<div class="card" style="padding:16px;display:flex;flex-direction:column;gap:8px">'+
+      '<p class="sec-lbl">🛡️ Security Status</p>'+
+      '<div style="display:flex;flex-direction:column;gap:5px">'+
+        ['RLS enforced on all tables','Soft delete (data preserved)','Audit log on every change','Input sanitisation active','Optimistic concurrency lock','Offline write queue','JWT session management','Rate-limited login (5/min)'].map(item=>'<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text)"><span style="color:var(--green);font-weight:800">✓</span>'+esc(item)+'</div>').join("")+
+        '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--amber)"><span style="font-weight:800">⚠</span>MFA: configure in Supabase Auth settings</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--amber)"><span style="font-weight:800">⚠</span>Backups: schedule in Supabase dashboard</div>'+
+      '</div>'+
+    '</div>'+
+
+    // App info
+    '<div class="card" style="padding:16px;text-align:center">'+
+      '<p style="font-size:12px;color:var(--sub);line-height:1.8">MedEquip Inventory · v2.0.0<br/>'+(STATE.offline?"⚠️ Offline/Demo Mode":"🟢 Connected to Supabase")+'<br/><span style="font-size:10px;opacity:.7">© '+new Date().getFullYear()+' — Authorised hospital use only</span></p>'+
+    '</div>'+
+  '</div></div>';
+}
+
+/* ─── MODAL (Login + Equipment form + Bulk + SQL) ─ */
+function renderModal(){
+  /* Admin login */
+  if(STATE.modal==="adminLogin"){
+    return '<div class="overlay" role="dialog" aria-modal="true">'+
+      '<div class="mbox"><div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<h2 style="font-weight:900;font-size:20px;color:var(--text)">🔐 Admin Login</h2>'+
+        '<button id="btn-close-modal" style="background:var(--bg);border:none;width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;color:var(--sub);display:flex;align-items:center;justify-content:center">✕</button>'+
+      '</div>'+
+      '<p style="font-size:13px;color:var(--sub)">Enter your administrator credentials.</p>'+
+      (STATE.offline?'<div style="background:#fff3cd;border-radius:10px;padding:10px 14px;font-size:12px;color:#856404;font-weight:600">ℹ️ Demo mode: any email + password (6+ chars) accepted.</div>':"")+
+      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:9px 13px;font-size:11px;color:#166534;font-weight:600">🛡️ Protected: progressive lockout · session auth · DB-verified role</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:12px;font-weight:700;color:var(--sub)">Email</label><input class="inp" id="inp-email" type="email" placeholder="admin@hospital.com" autocomplete="username" maxlength="120"/></div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:12px;font-weight:700;color:var(--sub)">Password</label><input class="inp" id="inp-password" type="password" placeholder="••••••••" autocomplete="current-password" maxlength="200"/></div>'+
+      // hCaptcha widget — only injected when HCAPTCHA_SITE_KEY is configured
+      (HCAPTCHA_SITE_KEY?'<div id="hcaptcha-widget" style="margin:4px 0"></div>':'')+
+      '<div id="login-error" style="display:none;background:var(--red-lt);color:var(--red);border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600" role="alert"></div>'+
+      '<button class="btn btn-teal" id="btn-do-login">Login</button></div></div>';
+  }
+
+  /* Audit log viewer */
+  if(STATE.modal==="auditLog"){
+    const logs=STATE.auditLogs||[];
+    const ACTION_COLORS={"INSERT":"#22c55e","UPDATE":"#f59e0b","DELETE":"#ef4444"};
+    return '<div class="overlay" role="dialog" aria-modal="true">'+
+      '<div class="mbox" style="max-height:90vh">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+          '<h2 style="font-weight:900;font-size:19px;color:var(--text)">🔍 Audit Log</h2>'+
+          '<button id="btn-close-modal" style="background:var(--bg);border:none;width:34px;height:34px;border-radius:9px;font-size:18px;cursor:pointer;color:var(--sub);display:flex;align-items:center;justify-content:center">✕</button>'+
+        '</div>'+
+        '<p style="font-size:12px;color:var(--sub);margin-bottom:8px">Every change to equipment is recorded here. Required for medical asset compliance.</p>'+
+        (STATE.offline?'<div style="background:#fff3cd;border-radius:10px;padding:10px;font-size:12px;color:#856404;font-weight:600;margin-bottom:8px">⚠️ Audit log requires live Supabase connection.</div>':"")+
+        (logs.length===0?
+          '<div style="text-align:center;padding:24px;color:var(--sub)"><div style="font-size:32px;margin-bottom:8px">📋</div><div style="font-weight:700">No audit records yet</div><div style="font-size:12px;margin-top:4px">Records appear here after any equipment change.</div></div>'
+          :
+          '<div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto">'+
+          logs.slice(0,50).map(l=>'<div style="background:#f8fafc;border-radius:10px;padding:12px;border-left:3px solid '+(ACTION_COLORS[l.action]||"#94a3b8")+'">'+
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+
+              '<span style="font-size:11px;font-weight:800;color:'+(ACTION_COLORS[l.action]||"#94a3b8")+'">'+esc(l.action)+'</span>'+
+              '<span style="font-size:10px;color:var(--sub)">'+esc(l.changed_at?new Date(l.changed_at).toLocaleString():"")+'</span>'+
+            '</div>'+
+            '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px">'+esc(l.new_data?.name||l.old_data?.name||"Equipment #"+l.record_id)+'</div>'+
+            '<div style="font-size:11px;color:var(--sub)">By: '+esc(l.user_email||"Unknown")+'</div>'+
+            (l.action==="UPDATE"&&l.old_data?'<div style="font-size:10px;color:var(--sub);margin-top:4px;font-style:italic">Status: '+esc(l.old_data.status||"")+'  →  '+esc(l.new_data?.status||"")+'</div>':"")
+          +'</div>').join("")+
+          '</div>')+
+        '<button class="btn btn-teal" id="btn-refresh-audit" style="padding:10px;margin-top:8px">🔄 Refresh</button>'+
+      '</div></div>';
+  }
+
+  /* Step-by-step setup guide */
+  if(STATE.modal==="setupGuide"){
+    const steps=[
+      {n:1,ico:"🌐",title:"Create Supabase Project",body:"Go to <strong>supabase.com</strong> → Sign up → New Project. Choose a name (e.g. medequip), set a strong database password, pick the region closest to your hospital. Wait ~2 minutes for provisioning."},
+      {n:2,ico:"🔑",title:"Get Your API Keys",body:"In your project: go to <strong>Settings → API</strong>. Copy the <strong>Project URL</strong> (looks like https://abc123.supabase.co) and the <strong>anon public key</strong> (long JWT string). NEVER use the service_role key in this app."},
+      {n:3,ico:"📋",title:"Run the Setup SQL",body:"Go to <strong>SQL Editor</strong> in Supabase. Click the SQL viewer button in Settings, copy ALL the SQL, paste it in, and click Run. This creates all tables, roles, audit logging, and security policies."},
+      {n:4,ico:"👤",title:"Create Users in Supabase",body:"Go to <strong>Authentication → Users → Add User</strong>. Enter email and a strong password (12+ chars). Click <strong>Create User</strong>. Important: the user is created with 'viewer' role by default — you must run the SQL in Step 5 to promote them to admin. Create all your users here (admin, engineers, etc.) before assigning roles."},
+      {n:5,ico:"⚙️",title:"Assign Roles via SQL",body:"After creating users, go to <strong>SQL Editor</strong> and run these — one per user:<br/><br/><strong>Step 5a — First login to create profile rows:</strong><br/>Each user must log into the app once first. The app auto-creates their profile on login.<br/><br/><strong>OR run this SQL directly:</strong><br/><code style='background:#1e293b;color:#a5f3fc;padding:4px 8px;border-radius:6px;font-size:10px;display:block;margin:4px 0'>SELECT ensure_my_profile() -- run as each user</code><br/><strong>Then assign roles:</strong><br/><code style='background:#1e293b;color:#22c55e;padding:4px 8px;border-radius:6px;font-size:10px;display:block;margin:4px 0'>UPDATE profiles SET role='admin' WHERE email='admin@hospital.com';</code><code style='background:#1e293b;color:#60a5fa;padding:4px 8px;border-radius:6px;font-size:10px;display:block;margin:4px 0'>UPDATE profiles SET role='engineer' WHERE email='eng@hospital.com';</code>Roles: admin (full access) · engineer (edit/maintain) · technician (view+mark done) · viewer (read only)"},
+      {n:6,ico:"🔒",title:"Enable MFA (Recommended)",body:"Go to <strong>Authentication → Providers → Multi-Factor Auth</strong>. Enable TOTP. Then in <strong>Authentication → Policies</strong>, enforce MFA for admin actions. Admins should use an authenticator app (Google Authenticator / Authy)."},
+      {n:7,ico:"💻",title:"Connect the App",body:"Open medequip-inventory.html. Find the two config lines at the top of the script and replace YOUR_PROJECT and YOUR_ANON_KEY with your actual Supabase Project URL and anon key."},
+      {n:8,ico:"🚀",title:"Deploy to GitHub Pages",body:"Push the updated HTML file to your GitHub repo. Go to <strong>Repository Settings → Pages → Source → main branch</strong>. The app is live at https://your-org.github.io/repo-name/. Any future changes you push will auto-deploy."},
+      {n:9,ico:"🔐",title:"Lock Down Supabase Security",body:"Do all of these before going live:<br/>① <strong>Auth → Settings → Disable sign ups</strong> (only manually-created users can access)<br/>② <strong>Auth → Providers → Enable MFA (TOTP)</strong> — require admins to use Google Authenticator or Authy<br/>③ <strong>Auth → Settings → Session timeout: 3600s</strong> (1 hour)<br/>④ <strong>Auth → Settings → Enable Email Confirmations</strong><br/>⑤ Verify RLS is active: Database → Tables → each table must show 🔒 RLS Enabled"},
+      {n:10,ico:"💾",title:"Set Up Backups",body:"In Supabase Pro plan: go to <strong>Database → Backups</strong> and enable daily backups. For the free plan, schedule a weekly export from <strong>Settings → Database → Download backup</strong>. Keep at least 4 weeks of backups."},
+      {n:11,ico:"🛡️",title:"Phase 2 — Harden Further (after go-live)",body:"These are not required immediately but improve security significantly:<br/><br/>① <strong>Self-host JS libraries</strong> — download Chart.js, xlsx, jsPDF and serve them from your repo. This eliminates CDN dependency risk and allows you to remove unsafe-inline from the CSP.<br/><br/>② <strong>Enable hCaptcha</strong> — Supabase Auth Settings → Captcha → Enable hCaptcha (free tier available). Prevents automated credential stuffing.<br/><br/>③ <strong>Move bulk import to Edge Function</strong> — creates server-side rate limiting and per-operation audit logging.<br/><br/>④ <strong>Add Supabase API rate limits</strong> — Settings → API → Rate Limiting (Pro plan)."},
+    ];
+    return '<div class="overlay" role="dialog" aria-modal="true">'+
+      '<div class="mbox" style="max-height:92vh">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+          '<h2 style="font-weight:900;font-size:19px;color:var(--text)">📖 Supabase Setup Guide</h2>'+
+          '<button id="btn-close-modal" style="background:var(--bg);border:none;width:34px;height:34px;border-radius:9px;font-size:18px;cursor:pointer;color:var(--sub);display:flex;align-items:center;justify-content:center">✕</button>'+
+        '</div>'+
+        '<p style="font-size:12px;color:var(--sub);margin-bottom:8px">Complete setup guide. Follow each step in order.</p>'+
+        '<div style="display:flex;flex-direction:column;gap:10px">'+
+        steps.map(s=>'<div style="display:flex;gap:12px;background:#f8fafc;border-radius:12px;padding:13px">'+
+          '<div style="width:36px;height:36px;border-radius:50%;background:var(--teal);color:#fff;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+s.n+'</div>'+
+          '<div><div style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:4px">'+s.ico+' '+esc(s.title)+'</div>'+
+          '<div style="font-size:12px;color:var(--sub);line-height:1.6">'+s.body+'</div></div>'+
+        '</div>').join("")+
+        '</div>'+
+        '<div style="background:var(--teal-lt);border-radius:12px;padding:14px;margin-top:4px">'+
+          '<div style="font-size:12px;font-weight:800;color:var(--teal);margin-bottom:6px">⚠️ Security Checklist Before Going Live</div>'+
+          '<div style="display:flex;flex-direction:column;gap:4px">'+
+          [
+            'RLS enabled on all tables (done by SQL above)',
+            'No service_role key in frontend code',
+            'Admin MFA enabled (Auth → Providers → MFA → TOTP)',
+            'hCaptcha enabled (Auth → Settings → Enable Captcha)',
+            'Email sign-ups disabled (Auth → Settings → Disable sign ups)',
+            'Session timeout 3600s (Auth → Settings → JWT expiry)',
+            'Database backups scheduled (Database → Backups)',
+            'HTTPS enforced (GitHub Pages does this automatically)',
+            'Verify RLS: Database → Tables → each table shows 🔒',
+            'Admin role assigned via SQL (UPDATE profiles SET role=...)',
+          ].map(item=>'<div style="font-size:11px;color:var(--text);display:flex;align-items:center;gap:6px"><span style="color:var(--green);font-weight:700">✓</span>'+esc(item)+'</div>').join("")+
+          '</div>'+
+          '<div style="margin-top:10px;font-size:11px;font-weight:700;color:#b45309">Phase 2 (after go-live): Move bulk import + delete to Edge Functions for server-side rate limiting and audit logging per operation.</div>'+
+        '</div>'+
+        '<button class="btn btn-teal" id="btn-show-sql" style="padding:10px">📋 View Full Setup SQL Next</button>'+
+      '</div></div>';
+  }
+
+  /* Service History modal */
+  if(STATE.modal==="serviceHistory"){
+    const e=STATE.historyItem;
+    const logs=STATE.historyLogs;
+    const ACTION_COLORS={"INSERT":"#22c55e","UPDATE":"#f59e0b","DELETE":"#ef4444"};
+    const ACTION_LABELS={"INSERT":"➕ Created","UPDATE":"✏️ Updated","DELETE":"🗑 Deleted"};
+    return '<div class="overlay" role="dialog" aria-modal="true">'+
+      '<div class="mbox" style="max-height:92vh">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+          '<div>'+
+            '<h2 style="font-weight:900;font-size:18px;color:var(--text)">📋 Service History</h2>'+
+            (e?'<div style="font-size:12px;color:var(--sub);margin-top:2px">'+esc(e.name)+' · SN: '+esc(e.serial_number)+'</div>':"")+
+          '</div>'+
+          '<button id="btn-close-modal" style="background:var(--bg);border:none;width:34px;height:34px;border-radius:9px;font-size:18px;cursor:pointer;color:var(--sub)">✕</button>'+
+        '</div>'+
+
+        // Summary strip
+        (e?'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px">'+
+          ['<div style="background:var(--teal-lt);border-radius:10px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:900;color:var(--teal)">'+logs.length+'</div><div style="font-size:9px;font-weight:700;color:var(--sub);text-transform:uppercase">Events</div></div>',
+           '<div style="background:var(--green-lt);border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;font-weight:900;color:var(--green-dk)">'+esc(e.status.replace(/_/g," "))+'</div><div style="font-size:9px;font-weight:700;color:var(--sub);text-transform:uppercase">Current Status</div></div>',
+           '<div style="background:var(--amber-lt);border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;font-weight:900;color:#92400e">'+esc(e.next_maintenance)+'</div><div style="font-size:9px;font-weight:700;color:var(--sub);text-transform:uppercase">Next Maint.</div></div>',
+          ].join("")+
+        '</div>':"")+ 
+
+        // Log entries
+        (STATE.offline?
+          '<div style="text-align:center;padding:24px;color:var(--sub)"><div style="font-size:28px;margin-bottom:8px">🔌</div><div style="font-weight:700">Offline Mode</div><div style="font-size:12px;margin-top:4px">Connect to Supabase to view service history.</div></div>'
+          :logs.length===0?
+          '<div style="text-align:center;padding:24px;color:var(--sub)"><div style="font-size:28px;margin-bottom:8px">📋</div><div style="font-weight:700">Loading history…</div></div>'
+          :
+          '<div style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto">'+
+          logs.map(l=>{
+            const oldData=l.old_data?JSON.parse(JSON.stringify(l.old_data)):{};
+            const newData=l.new_data?JSON.parse(JSON.stringify(l.new_data)):{};
+            const changes=[];
+            if(l.action==="UPDATE"){
+              const tracked=["status","calibration_status","location","next_maintenance","next_calibration","notes"];
+              tracked.forEach(k=>{
+                if(oldData[k]!==newData[k]&&(oldData[k]||newData[k])){
+                  changes.push('<span style="font-size:10px;color:var(--sub)">'+esc(k.replace(/_/g," "))+': </span>'+
+                    '<span style="font-size:10px;color:var(--red);text-decoration:line-through">'+esc(String(oldData[k]||"—"))+'</span>'+
+                    '<span style="font-size:10px;color:var(--sub)"> → </span>'+
+                    '<span style="font-size:10px;color:var(--green-dk);font-weight:700">'+esc(String(newData[k]||"—"))+'</span>');
+                }
+              });
+            }
+            return '<div style="background:#f8fafc;border-radius:10px;padding:12px;border-left:3px solid '+(ACTION_COLORS[l.action]||"#94a3b8")+'">'+
+              '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">'+
+                '<span style="font-size:11px;font-weight:800;color:'+(ACTION_COLORS[l.action]||"#94a3b8")+'">'+(ACTION_LABELS[l.action]||l.action)+'</span>'+
+                '<span style="font-size:10px;color:var(--sub);white-space:nowrap">'+esc(l.changed_at?new Date(l.changed_at).toLocaleString():"")+'</span>'+
+              '</div>'+
+              (l.user_email?'<div style="font-size:11px;color:var(--sub);margin-bottom:4px">By: '+esc(l.user_email)+'</div>':"")+
+              (changes.length?'<div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">'+changes.join("")+'</div>':"")+
+            '</div>';
+          }).join("")+
+          '</div>')+
+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'+
+          '<button class="btn btn-ghost" id="btn-refresh-history" style="padding:10px;font-size:12px">🔄 Refresh</button>'+
+          '<button class="btn btn-outline" id="btn-close-modal" style="padding:10px;font-size:12px">Close</button>'+
+        '</div>'+
+      '</div></div>';
+  }
+
+  /* QR Code modal */
+  if(STATE.modal==="qrCode"&&STATE.qrItem){
+    const e=STATE.qrItem;
+    const sc=STATUS_CFG[e.status]||{label:e.status,bg:"#94a3b8"};
+    // QR data: JSON with key equipment fields
+    const qrData=JSON.stringify({
+      id:e.id,name:e.name,serial:e.serial_number,
+      location:e.location,status:e.status,
+      nextMaint:e.next_maintenance
+    });
+    return '<div class="overlay" role="dialog" aria-modal="true">'+
+      '<div class="mbox" style="max-height:90vh;align-items:center;text-align:center">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:4px">'+
+          '<h2 style="font-weight:900;font-size:18px;color:var(--text)">📱 QR Code</h2>'+
+          '<button id="btn-close-modal" style="background:var(--bg);border:none;width:34px;height:34px;border-radius:9px;font-size:18px;cursor:pointer;color:var(--sub)">✕</button>'+
+        '</div>'+
+        '<div style="background:#f8fafc;border-radius:12px;padding:14px;width:100%;text-align:left;margin-bottom:12px">'+
+          '<div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:4px">'+esc(e.name)+'</div>'+
+          '<div style="font-size:12px;color:var(--sub)">SN: '+esc(e.serial_number)+' · '+esc(e.location)+'</div>'+
+          '<div style="margin-top:6px">'+funcBadge(e.status)+'</div>'+
+        '</div>'+
+        '<div id="qr-canvas-wrap" style="background:#fff;border-radius:12px;padding:20px;display:inline-block;box-shadow:0 2px 12px rgba(0,0,0,.1);margin-bottom:12px">'+
+          '<div id="qr-code-output"></div>'+
+          '<div style="font-size:10px;color:var(--sub);margin-top:8px;font-weight:600">'+esc(e.serial_number)+' · '+esc(e.name)+'</div>'+
+        '</div>'+
+        '<p style="font-size:11px;color:var(--sub);line-height:1.6;margin-bottom:8px">Scan to view equipment details. Encoded: ID, name, serial, location, status, next maintenance.</p>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">'+
+          '<button class="btn btn-teal" id="btn-print-qr" style="font-size:13px;padding:10px">🖨️ Print QR</button>'+
+          '<button class="btn btn-ghost" id="btn-download-qr" style="font-size:13px;padding:10px">💾 Save PNG</button>'+
+        '</div>'+
+      '</div></div>';
+  }
+
+  /* SQL viewer */
+  if(STATE.modal==="sqlView"){
+    const sql=`-- ═══════════════════════════════════════════════════════════════
 -- MedEquip Inventory — Complete Supabase Production Setup
 -- Run this ONCE in Supabase SQL Editor (Database → SQL Editor)
 -- ═══════════════════════════════════════════════════════════════
@@ -297,4 +2281,642 @@ REVOKE INSERT, UPDATE, DELETE ON audit_log FROM anon;
 -- ═══════════════════════════════════════════════════════════════
 -- SETUP COMPLETE.
 -- Next steps are in the app: Settings → View Setup SQL → Step-by-Step Guide
--- ═══════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════════`;
+    return '<div class="overlay" role="dialog" aria-modal="true">'+
+      '<div class="mbox" style="max-height:88vh"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-weight:900;font-size:18px;color:var(--text)">🗄️ Supabase Setup SQL</h2>'+
+        '<button id="btn-close-modal" style="background:var(--bg);border:none;width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;color:var(--sub);display:flex;align-items:center;justify-content:center">✕</button></div>'+
+      '<div style="background:#1e293b;border-radius:12px;padding:14px;overflow-x:auto"><pre id="sql-content" style="font-size:10px;color:#a5f3fc;font-family:monospace;line-height:1.7;white-space:pre-wrap;margin:0">'+esc(sql)+'</pre></div>'+
+      '<p style="font-size:12px;color:var(--sub);line-height:1.6">📌 Run this <strong>once</strong> only. After that all app actions update the database automatically.</p>'+
+      '<button class="btn btn-teal" id="btn-copy-sql">📋 Copy SQL</button></div></div>';
+  }
+
+  /* Bulk upload */
+  if(STATE.modal==="bulkUpload"){
+    const br=STATE.bulkResult;
+    return '<div class="overlay" role="dialog" aria-modal="true">'+
+      '<div class="mbox" style="max-height:92vh"><div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<h2 style="font-weight:900;font-size:20px;color:var(--text)">📥 Bulk Upload</h2>'+
+        '<button id="btn-close-modal" style="background:var(--bg);border:none;width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;color:var(--sub);display:flex;align-items:center;justify-content:center">✕</button>'+
+      '</div>'+
+      // Step 1
+      '<div style="background:var(--teal-lt);border:1.5px solid var(--teal-mid);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px">'+
+        '<div style="font-size:13px;font-weight:800;color:var(--teal)">Step 1 — Download Template</div>'+
+        '<p style="font-size:12px;color:var(--sub);line-height:1.5">Download the Excel template, fill in your data, then upload below.</p>'+
+        '<button class="btn btn-teal" id="btn-dl-template" style="padding:10px;font-size:13px">📥 Download Excel Template</button>'+
+      '</div>'+
+      // Column format
+      '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px">'+
+        '<div style="font-size:11px;font-weight:800;color:var(--text);margin-bottom:4px">📋 Column Format (10 columns)</div>'+
+        [
+          ["A — name",              "2–120 characters · Required"],
+          ["B — category",          "One of: "+getCategories().join(", ")+" · Required (or close match — auto-corrected)"],
+          ["C — serial_number",     "Alphanumeric, - _ . / · Max 60 · Required"],
+          ["D — location",          "One of: "+getLocations().join(", ")+" · Required (or close match — auto-corrected)"],
+          ["E — status",            "functional_in_use · functional_not_in_use · non_functional · needs_repair · obsolete (or plain labels like 'Functional & In Use')"],
+          ["F — next_maintenance",  "YYYY-MM-DD or DD/MM/YYYY · Required"],
+          ["G — calibration_status","cal_required (or yes/y) · cal_not_required (or no/n) · Required"],
+          ["H — last_calibration",  "YYYY-MM-DD or DD/MM/YYYY · Optional"],
+          ["I — next_calibration",  "YYYY-MM-DD or DD/MM/YYYY · Required if cal_required"],
+          ["J — notes",             "Free text · Max 500 · Optional"],
+        ].map(([col,rule])=>'<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="font-size:10px;font-weight:800;color:var(--teal);min-width:52px;flex-shrink:0">'+esc(col.split("—")[0].trim())+'</span><div><div style="font-size:11px;font-weight:700;color:var(--text)">'+esc((col.split("—")[1]||"").trim())+'</div><div style="font-size:10px;color:var(--sub)">'+esc(rule)+'</div></div></div>').join("")+
+      '</div>'+
+      // Step 2
+      '<div style="background:#fff;border:2px dashed var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer" id="bulk-drop-zone">'+
+        '<div style="font-size:32px">📊</div>'+
+        '<div style="font-weight:700;color:var(--text);font-size:14px">Step 2 — Upload Filled Excel</div>'+
+        '<div style="font-size:12px;color:var(--sub)">Tap to choose file or drag & drop</div>'+
+        '<input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv" style="display:none"/>'+
+        '<button class="btn btn-ghost" style="padding:9px 18px;font-size:13px;width:auto" id="btn-choose-file">Choose File</button>'+
+      '</div>'+
+      // Result
+      (br?(()=>{
+        const hasErrors=br.errors.length>0;
+        const hasWarnings=(br.warnings||[]).length>0;
+        return '<div style="background:'+(hasErrors?"var(--red-lt)":"var(--green-lt)")+';border:1.5px solid '+(hasErrors?"var(--red)":"var(--green)")+';border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px">'+
+          '<div style="font-weight:800;font-size:14px;color:'+(hasErrors?"var(--red)":"var(--green-dk)")+'">'+(hasErrors?"⚠️ Validation Errors Found":"✅ Ready to Import")+'</div>'+
+          '<div style="font-size:13px;color:var(--text)">'+
+            '<strong style="color:var(--green-dk)">'+br.valid.length+'</strong> valid rows &nbsp;·&nbsp; '+
+            '<strong style="color:'+(hasErrors?"var(--red)":"var(--sub)")+'">'+br.errors.length+'</strong> errors'+
+            (hasWarnings?' &nbsp;·&nbsp; <strong style="color:var(--amber)">'+(br.warnings||[]).length+'</strong> auto-corrected':'')+
+          '</div>'+
+
+          // Warnings (auto-corrections)
+          (hasWarnings?'<div style="background:#fffbeb;border:1px solid var(--amber);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:3px">'+
+            '<div style="font-size:11px;font-weight:800;color:#92400e;margin-bottom:3px">🔧 Auto-Corrected (rows accepted):</div>'+
+            (br.warnings||[]).slice(0,5).map(w=>'<div style="font-size:10.5px;color:#92400e">Row '+w.row+': '+w.msgs.map(m=>esc(m)).join(" · ")+'</div>').join("")+
+            ((br.warnings||[]).length>5?'<div style="font-size:10px;color:var(--sub)">...and '+((br.warnings||[]).length-5)+' more</div>':'')+
+          '</div>':"")+ 
+
+          // Errors
+          (hasErrors?'<div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">'+
+            br.errors.slice(0,20).map(e=>'<div style="font-size:11px;color:var(--red);background:#fff;border-radius:7px;padding:6px 10px;border-left:3px solid var(--red)">'+
+              '<strong>Row '+e.row+':</strong> '+esc(e.msg)+
+              (e.warnings&&e.warnings.length?' <span style="color:var(--amber)">('+e.warnings.map(w=>esc(w)).join(", ")+')</span>':'')+
+            '</div>').join("")+
+            (br.errors.length>20?'<div style="font-size:11px;color:var(--sub);padding:4px 8px">...and '+(br.errors.length-20)+' more errors. Download a corrected template for help.</div>':'')+
+          '</div>':"")+
+
+          // Import button
+          (br.valid.length&&!hasErrors?'<button class="btn btn-teal" id="btn-confirm-bulk" style="padding:12px;margin-top:4px">⬆️ Import '+br.valid.length+' Equipment Items</button>':"")+ 
+          (br.valid.length&&hasErrors?'<div style="font-size:11px;color:var(--sub);background:#f8fafc;border-radius:8px;padding:8px">'+br.valid.length+' rows are valid and ready — fix the '+br.errors.length+' errors above to enable import, or download the corrected template.</div>':"")+ 
+          (hasErrors?'<button class="btn btn-ghost" id="btn-dl-corrected-template" style="padding:9px;font-size:12px">📥 Download Corrected Template (valid rows pre-filled)</button>':"")+
+          (hasErrors?'<details style="margin-top:4px"><summary style="font-size:11px;font-weight:700;color:var(--teal);cursor:pointer">📋 Valid values for your system</summary>'+
+            '<div style="font-size:10.5px;color:var(--sub);margin-top:6px;line-height:1.7">'+
+            '<strong>Categories:</strong> '+getCategories().map(c=>esc(c)).join(" · ")+'<br/>'+
+            '<strong>Locations:</strong> '+getLocations().map(l=>esc(l)).join(" · ")+'<br/>'+
+            '<strong>Status:</strong> functional_in_use · functional_not_in_use · non_functional · needs_repair · obsolete<br/>'+
+            '<strong>Cal Status:</strong> cal_required (or yes) · cal_not_required (or no)<br/>'+
+            '<strong>Dates:</strong> YYYY-MM-DD preferred · DD/MM/YYYY · MM/DD/YYYY also accepted'+
+            '</div></details>':"")+ 
+        '</div>';
+      })():"")+'</div></div>';
+  }
+
+  /* Equipment form — admin only */
+  if(!isAdmin())return"";
+  const isEdit=STATE.modal&&STATE.modal!=="add";
+  const item=isEdit?STATE.modal:{};
+  const calReq=(item.calibration_status||"cal_not_required")==="cal_required";
+
+  return '<div class="overlay" role="dialog" aria-modal="true" aria-label="'+(isEdit?"Edit":"Add")+' Equipment">'+
+    '<div class="mbox">'+
+
+      // ── Header ──────────────────────────────────────────────────────────
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<h2 style="font-weight:900;font-size:20px;color:var(--text)">'+(isEdit?"✏️ Edit":"➕ Add")+' Equipment</h2>'+
+        '<button id="btn-close-modal" style="background:var(--bg);border:none;width:34px;height:34px;border-radius:9px;font-size:18px;cursor:pointer;color:var(--sub);display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>'+
+      '</div>'+
+      '<p style="font-size:12px;color:var(--sub);margin-bottom:4px">Fields marked <span style="color:var(--red)">*</span> are required.</p>'+
+
+      // ── Basic Info ───────────────────────────────────────────────────────
+      fField("Equipment Name","inp-name","text",item.name||"",true)+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div style="display:flex;flex-direction:column;gap:4px">'+
+          '<label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px">Category <span style="color:var(--red)">*</span></label>'+
+          '<select class="inp" id="inp-category">'+getCategories().map(c=>'<option value="'+esc(c)+'" '+(item.category===c?"selected":"")+'>'+esc(c)+'</option>').join("")+'</select>'+
+        '</div>'+
+        fField("Serial / Asset No.","inp-serial","text",item.serial_number||"",true)+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div style="display:flex;flex-direction:column;gap:4px">'+
+          '<label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px">Location <span style="color:var(--red)">*</span></label>'+
+          '<select class="inp" id="inp-location">'+getLocations().map(l=>'<option value="'+esc(l)+'" '+(item.location===l?"selected":"")+'>'+esc(l)+'</option>').join("")+'</select>'+
+        '</div>'+
+        fField("Next Maintenance","inp-maint","date",item.next_maintenance||today(),true)+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px">'+
+        '<label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px">Maintenance Recurrence</label>'+
+        '<select class="inp" id="inp-maint-interval">'+
+          Object.entries(RECURRENCE_OPTIONS).map(([k,v])=>'<option value="'+k+'" '+(String(item.maintenance_interval||DEFAULT_RECURRENCE)===k?"selected":"")+'>'+esc(v.label)+'</option>').join("")+
+        '</select>'+
+      '</div>'+
+
+      // ── Status Section ───────────────────────────────────────────────────
+      '<div style="background:#f8fafc;border:1.5px solid var(--border);border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:10px">'+
+        '<div style="font-size:11px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px">📋 Status — Fill Both Fields</div>'+
+
+        // Field 1: Functional Status
+        '<div style="background:#fff;border:1.5px solid var(--teal-mid);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px">'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            '<span style="font-size:16px">⚙️</span>'+
+            '<span style="font-size:10px;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:.8px">1 of 2 — Functional Status</span>'+
+          '</div>'+
+          '<p style="font-size:11px;color:var(--sub);line-height:1.5;margin:0">Is the equipment physically working?</p>'+
+          '<select class="inp" id="inp-status" style="margin-top:2px">'+
+            Object.entries(STATUS_CFG).map(([k,v])=>'<option value="'+esc(k)+'" '+(item.status===k?"selected":"")+'>'+v.icon+' '+esc(v.label)+'</option>').join("")+
+          '</select>'+
+          '<span class="field-err" id="err-inp-status" role="alert"></span>'+
+        '</div>'+
+
+        // Field 2: Calibration Status
+        '<div style="background:#fff;border:1.5px solid '+(calReq?"var(--amber)":"var(--border)")+';border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px">'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            '<span style="font-size:16px">⏰</span>'+
+            '<span style="font-size:10px;font-weight:800;color:#b45309;text-transform:uppercase;letter-spacing:.8px">2 of 2 — Calibration Status</span>'+
+          '</div>'+
+          '<p style="font-size:11px;color:var(--sub);line-height:1.5;margin:0">Does this equipment require periodic calibration?</p>'+
+          '<select class="inp" id="inp-cal-status" onchange="toggleCalDates(this.value)" style="margin-top:2px">'+
+            Object.entries(CAL_STATUS).map(([k,v])=>'<option value="'+esc(k)+'" '+((item.calibration_status||"cal_not_required")===k?"selected":"")+'>'+v.icon+' '+esc(v.label)+'</option>').join("")+
+          '</select>'+
+          '<span class="field-err" id="err-inp-cal-status" role="alert"></span>'+
+        '</div>'+
+      '</div>'+
+
+      // ── Calibration Dates (conditional) ─────────────────────────────────
+      '<div id="cal-dates-wrap" style="'+(calReq?"":"opacity:.35;pointer-events:none;")+'display:flex;flex-direction:column;gap:0;transition:opacity .2s">'+
+        '<div style="background:'+(calReq?"#fef3c7":"#f8fafc")+';border:1.5px solid '+(calReq?"var(--amber)":"var(--border)")+';border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:10px">'+
+          '<div style="font-size:11px;font-weight:700;color:'+(calReq?"#92400e":"var(--sub)")+';display:flex;align-items:center;gap:6px">'+
+            '<span id="cal-hint-icon">'+(calReq?"🔧":"ℹ️")+'</span>'+
+            '<span id="cal-hint-text">'+(calReq?"Fill in both calibration dates below":"Select Calibration Required above to enable")+'</span>'+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+            fField("Last Calibration Date","inp-last-cal","date",item.last_calibration||"",false)+
+            fField("Next Calibration Date","inp-next-cal","date",item.next_calibration||"",calReq)+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:4px">'+
+            '<label style="font-size:11px;font-weight:700;color:'+(calReq?"#92400e":"var(--sub)")+';text-transform:uppercase;letter-spacing:.5px">Calibration Recurrence</label>'+
+            '<select class="inp" id="inp-cal-interval" '+(calReq?"":"style=\"opacity:.4\" disabled")+'>'+
+              Object.entries(CAL_RECURRENCE_OPTIONS).map(([k,v])=>'<option value="'+k+'" '+(String(item.calibration_interval||DEFAULT_CAL_RECURRENCE)===k?"selected":"")+'>'+esc(v.label)+'</option>').join("")+
+            '</select>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+
+      // ── Notes ────────────────────────────────────────────────────────────
+      '<div style="display:flex;flex-direction:column;gap:4px">'+
+        '<label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px">Notes</label>'+
+        '<textarea class="inp" id="inp-notes" rows="3" style="resize:vertical" maxlength="500" placeholder="Optional notes…">'+esc(item.notes||"")+'</textarea>'+
+      '</div>'+
+
+      // ── Error + Buttons ──────────────────────────────────────────────────
+      '<div id="form-err" style="display:none;background:var(--red-lt);color:var(--red);border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600" role="alert"></div>'+
+      '<button class="btn btn-teal" id="btn-save-eq">💾 '+(isEdit?"Update":"Save")+'  Equipment</button>'+
+      (isEdit?'<button class="btn btn-outline" id="btn-delete-eq" style="color:var(--red);border-color:var(--red)">🗑 Delete Equipment</button>':"")+
+
+    '</div></div>';
+}
+function fField(label,id,type,value,req){
+  return '<div style="display:flex;flex-direction:column;gap:4px">'+
+    '<label style="font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px" for="'+esc(id)+'">'+esc(label)+(req?' <span style="color:var(--red)">*</span>':"")+'</label>'+
+    '<input class="inp" id="'+esc(id)+'" type="'+esc(type)+'" value="'+esc(value)+'" placeholder="'+esc(label)+'" maxlength="'+(type==="date"?10:120)+'"/>'+
+    '<span class="field-err" id="err-'+esc(id)+'" role="alert"></span></div>';
+}
+
+function toggleCalDates(val){
+  const wrap=document.getElementById("cal-dates-wrap");
+  const inner=wrap?.querySelector("div");
+  const hint=inner?.querySelector("span");
+  const req=val==="cal_required";
+  if(wrap){wrap.style.opacity=req?"1":".35";wrap.style.pointerEvents=req?"auto":"none";}
+  if(inner){inner.style.background=req?"#fef3c7":"#f8fafc";inner.style.borderColor=req?"var(--amber)":"var(--border)";}
+  if(hint){hint.textContent=req?"🔧 Fill in calibration dates:":"ℹ️ Select Calibration Required above to enable";}
+}
+
+/* ═══════════════════════════════════════════════════════
+   14. EVENT BINDING
+═══════════════════════════════════════════════════════ */
+function bindEvents(){
+  function on(id,fn){const el=document.getElementById(id);if(el)el.addEventListener("click",fn);}
+  function showFE(id,msg){const el=document.getElementById(id);if(el)el.classList.add("err");const e=document.getElementById("err-"+id);if(e){e.textContent=msg;e.style.display="block";}}
+  function clearFE(){document.querySelectorAll(".inp.err").forEach(el=>el.classList.remove("err"));document.querySelectorAll(".field-err").forEach(el=>{el.style.display="none";el.textContent="";});}
+
+  // Offline bar setup guide link
+  const offlineGuideLink=document.getElementById("offline-bar-guide");
+  if(offlineGuideLink)offlineGuideLink.addEventListener("click",e=>{e.preventDefault();STATE.modal="setupGuide";render();});
+
+  // Nav
+  document.querySelectorAll("[data-nav]").forEach(el=>el.addEventListener("click",()=>{STATE.tab=el.dataset.nav;STATE.search="";STATE.showAll=false;STATE.detail=null;STATE.report=null;render();}));
+
+  // Equipment cards
+  document.querySelectorAll("[data-eq-id]").forEach(el=>el.addEventListener("click",()=>{
+    const item=STATE.equipment.find(e=>e.id===el.dataset.eqId);if(!item)return;
+    if(isAdmin()){STATE.modal={...item};render();}
+    else{STATE.detail=item;render();}
+  }));
+
+  // Reports
+  document.querySelectorAll("[data-report]").forEach(el=>el.addEventListener("click",()=>{STATE.report=el.dataset.report;render();}));
+
+  // Detail view
+  on("btn-close-detail",()=>{STATE.detail=null;render();});
+  on("btn-close-detail-2",()=>{STATE.detail=null;render();});
+  on("btn-detail-edit",()=>{if(STATE.detail&&canEdit()){STATE.modal={...STATE.detail};STATE.detail=null;render();}});
+  on("btn-detail-qr",()=>{if(STATE.detail){STATE.qrItem={...STATE.detail};STATE.modal="qrCode";render();}});
+  on("btn-detail-history",()=>{if(STATE.detail){loadServiceHistory(STATE.detail.id);}});
+  on("btn-detail-delete",async()=>{
+    if(!STATE.detail||!isAdmin())return;
+    if(!confirm("Delete \""+san.text(STATE.detail.name)+"\"? This cannot be undone."))return;
+    try{await removeEquipment(STATE.detail.id);STATE.detail=null;render();showToast("Equipment deleted","info");}catch{}
+  });
+
+  // Equipment tab
+  on("btn-add-eq",()=>{if(!canEdit()){showToast("Admin or Engineer required","error");return;}STATE.modal="add";render();});
+  on("btn-admin-login-eq",()=>{STATE.modal="adminLogin";render();});
+  on("btn-view-all",()=>{STATE.showAll=!STATE.showAll;render();});
+  on("btn-load-all",()=>{STATE.showAll=true;render();});
+  const sq=document.getElementById("eq-search");
+  if(sq)sq.addEventListener("input",e=>{STATE.search=e.target.value;render();});
+
+  // Maintenance mark done
+  document.querySelectorAll(".btn-mark-done").forEach(btn=>btn.addEventListener("click",async e=>{
+    e.stopPropagation();if(!canEdit()){showToast("Admin or Engineer required","error");return;}
+    const item=STATE.equipment.find(x=>x.id===btn.dataset.id);if(!item)return;
+    btn.disabled=true;btn.textContent="Saving…";
+    try{
+      const maintInt=parseInt(item.maintenance_interval||DEFAULT_RECURRENCE);
+      const nd=maintInt>0?calcNextDate(today(),maintInt):item.next_maintenance;
+      await persistEquipment({...item,next_maintenance:nd,last_updated:today()});
+      showToast(item.name+" ✓ Done","success");await fetchEquipment();
+    }catch{btn.disabled=false;btn.textContent="✓ Mark Maintenance Done (+90 days)";}
+  }));
+
+  // Calibration mark done
+  document.querySelectorAll(".btn-mark-cal-done").forEach(btn=>btn.addEventListener("click",async e=>{
+    e.stopPropagation();if(!canEdit()){showToast("Admin or Engineer required","error");return;}
+    const item=STATE.equipment.find(x=>x.id===btn.dataset.id);if(!item)return;
+    btn.disabled=true;btn.textContent="Saving…";
+    try{
+      const newLastCal=today();
+      const calInt=parseInt(item.calibration_interval||DEFAULT_CAL_RECURRENCE);
+      const newNextCal=calcNextDate(today(),calInt);
+      await persistEquipment({...item,last_calibration:newLastCal,next_calibration:newNextCal,calibration_status:"cal_required",last_updated:today()});
+      showToast(item.name+" calibration recorded ✓","success");await fetchEquipment();
+    }catch{btn.disabled=false;btn.textContent="⏰ Mark Calibration Done (+1 year)";}
+  }));
+
+  // Report
+  on("btn-close-report",()=>{STATE.report=null;render();});
+  on("exp-csv",exportCSV);on("exp-xlsx",exportExcel);on("exp-pdf",exportPDF);
+
+  // Settings
+  on("btn-open-settings-login",()=>{STATE.modal="adminLogin";render();});
+  on("btn-logout",async()=>{await doLogout();showToast("Logged out","info");render();});
+  on("toggle-reminders",()=>{const v=!STATE.settings.reminders;saveSettingToDB("reminders",v).then(()=>render());render();});
+  on("btn-save-hospital",()=>{
+    const v=san.name(document.getElementById("inp-hospital-name")?.value||"");
+    if(!v||v.length<1){showToast("Invalid hospital name","error");return;}
+    saveSettingToDB("hospitalName",v).then(()=>render());showToast("Hospital name saved ✓ — syncing…","success");
+  });
+  on("btn-save-notif",()=>{
+    const t=san.num(document.getElementById("inp-cal-threshold")?.value||"30");
+    if(t<1||t>365){showToast("Threshold must be 1–365","error");return;}
+    saveSettingToDB("calThreshold",t);showToast("Preferences saved ✓ — syncing…","success");
+  });
+  on("btn-add-cat",()=>{
+    const list=document.getElementById("cat-list");if(!list)return;
+    const idx=list.children.length;
+    const row=document.createElement("div");row.style.cssText="display:flex;gap:8px;align-items:center";
+    row.innerHTML='<input class="inp cat-item" value="" style="flex:1;padding:9px 11px;font-size:13px" maxlength="60" placeholder="New category…"/><button style="background:var(--red-lt);border:none;color:var(--red);border-radius:9px;width:34px;height:34px;cursor:pointer;font-size:16px;flex-shrink:0">🗑</button>';
+    row.querySelector("button").addEventListener("click",()=>row.remove());
+    list.appendChild(row);row.querySelector("input").focus();
+  });
+  on("btn-add-loc",()=>{
+    const list=document.getElementById("loc-list");if(!list)return;
+    const row=document.createElement("div");row.style.cssText="display:flex;gap:8px;align-items:center";
+    row.innerHTML='<input class="inp loc-item" value="" style="flex:1;padding:9px 11px;font-size:13px" maxlength="60" placeholder="New location…"/><button style="background:var(--red-lt);border:none;color:var(--red);border-radius:9px;width:34px;height:34px;cursor:pointer;font-size:16px;flex-shrink:0">🗑</button>';
+    row.querySelector("button").addEventListener("click",()=>row.remove());
+    list.appendChild(row);row.querySelector("input").focus();
+  });
+  document.querySelectorAll(".btn-del-cat").forEach(btn=>btn.addEventListener("click",function(){this.closest("div").remove();}));
+  document.querySelectorAll(".btn-del-loc").forEach(btn=>btn.addEventListener("click",function(){this.closest("div").remove();}));
+  on("btn-save-cats",()=>{
+    const cats=[...document.querySelectorAll(".cat-item")].map(i=>san.text(i.value)).filter(v=>v.length>0);
+    if(cats.length<1){showToast("At least 1 category required","error");return;}
+    saveSettingToDB("categories",cats).then(()=>render());showToast(cats.length+" categories saved ✓ — syncing…","success");
+  });
+  on("btn-save-locs",()=>{
+    const locs=[...document.querySelectorAll(".loc-item")].map(i=>san.text(i.value)).filter(v=>v.length>0);
+    if(locs.length<1){showToast("At least 1 location required","error");return;}
+    saveSettingToDB("locations",locs).then(()=>render());showToast(locs.length+" locations saved ✓ — syncing…","success");
+  });
+  on("btn-open-bulk",()=>{if(!isAdmin()){showToast("Admin role required for bulk upload","error");return;}STATE.bulkResult=null;STATE.modal="bulkUpload";render();});
+  on("btn-dl-template",downloadTemplate);
+  on("btn-confirm-bulk",confirmBulk);
+  on("btn-dl-corrected-template",()=>{
+    if(!STATE.bulkResult?.valid?.length){showToast("No valid rows to export","error");return;}
+    if(typeof XLSX==="undefined"){showToast("Excel library not loaded","error");return;}
+    // Build worksheet with headers + only the VALID rows pre-filled
+    const headers=["name","category","serial_number","location","status","next_maintenance","calibration_status","last_calibration","next_calibration","notes"];
+    const rows=[headers,...STATE.bulkResult.valid.map(r=>headers.map(h=>r[h]||""))];
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"]=[20,22,18,20,28,14,22,14,18,30].map(w=>({wch:w}));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Valid_Rows");
+    XLSX.writeFile(wb,"medequip-valid-rows-"+today()+".xlsx");
+    showToast("Corrected template downloaded — "+STATE.bulkResult.valid.length+" valid rows","success");
+  });
+  on("btn-choose-file",()=>{const fi=document.getElementById("bulk-file-input");if(fi)fi.click();});
+  const bulkInput=document.getElementById("bulk-file-input");
+  if(bulkInput)bulkInput.addEventListener("change",e=>{const f=e.target.files[0];if(f)parseBulkFile(f);e.target.value="";});
+  const dropZone=document.getElementById("bulk-drop-zone");
+  if(dropZone){
+    dropZone.addEventListener("dragover",e=>{e.preventDefault();dropZone.style.borderColor="var(--teal)";dropZone.style.background="var(--teal-lt)";});
+    dropZone.addEventListener("dragleave",()=>{dropZone.style.borderColor="var(--border)";dropZone.style.background="#fff";});
+    dropZone.addEventListener("drop",e=>{e.preventDefault();dropZone.style.borderColor="var(--border)";dropZone.style.background="#fff";const f=e.dataTransfer.files[0];if(f)parseBulkFile(f);else showToast("Please drop an Excel or CSV file","error");});
+  }
+  on("exp-csv-s",exportCSV);on("exp-xlsx-s",exportExcel);on("exp-pdf-s",exportPDF);
+  on("btn-reset-data",()=>{if(confirm("Reset to sample data? All changes will be lost.")){STATE.equipment=JSON.parse(JSON.stringify(SEED));STATE.settings={...DEFAULT_SETTINGS,categories:[...DEFAULT_CATEGORIES],locations:[...DEFAULT_LOCATIONS]};saveP("medinv_settings",STATE.settings);["hospitalName","reminders","calThreshold","categories","locations"].forEach(k=>saveSettingToDB(k,STATE.settings[k]));showToast("Reset to sample data","info");render();}});
+  on("btn-show-sql",()=>{STATE.modal="sqlView";render();});
+  on("btn-show-guide",()=>{STATE.modal="setupGuide";render();});
+  on("btn-view-audit",async()=>{
+    STATE.modal="auditLog";
+    STATE.auditLogs=[];
+    render();
+    if(!STATE.offline){
+      try{
+        const logs=await sb.query("audit_log","order=changed_at.desc&limit=50");
+        if(Array.isArray(logs)){STATE.auditLogs=logs;render();}
+      }catch(e){showToast("Could not load audit log: "+e.message,"error");}
+    }
+  });
+  on("btn-refresh-audit",async()=>{
+    if(STATE.offline){showToast("Requires live Supabase connection","error");return;}
+    try{
+      const logs=await sb.query("audit_log","order=changed_at.desc&limit=50");
+      if(Array.isArray(logs)){STATE.auditLogs=logs;render();}
+    }catch(e){showToast("Refresh failed: "+e.message,"error");}
+  });
+  on("btn-refresh-history",async()=>{
+    if(!STATE.historyItem)return;
+    if(STATE.offline){showToast("Requires live Supabase connection","error");return;}
+    try{
+      const logs=await sb.query("audit_log",
+        "record_id=eq."+encodeURIComponent(STATE.historyItem.id)+"&order=changed_at.desc&limit=100");
+      if(Array.isArray(logs)){STATE.historyLogs=logs;render();}
+    }catch(e){showToast("Refresh failed: "+e.message,"error");}
+  });
+  on("btn-copy-sql",async()=>{const el=document.getElementById("sql-content");if(el)try{await navigator.clipboard.writeText(el.textContent);showToast("SQL copied ✓","success");}catch{showToast("Copy failed — select text manually","error");}});
+
+  // Modal common
+  on("btn-close-modal",()=>{STATE.modal=null;render();});
+  // Mount hCaptcha widget if configured
+  if(HCAPTCHA_SITE_KEY&&typeof hcaptcha!=="undefined"){
+    const captchaEl=document.getElementById("hcaptcha-widget");
+    if(captchaEl&&!captchaEl.dataset.rendered){
+      hcaptcha.render("hcaptcha-widget",{sitekey:HCAPTCHA_SITE_KEY,theme:"light",size:"normal"});
+      captchaEl.dataset.rendered="1";
+    }
+  }
+  on("btn-do-login",handleLogin);
+  on("btn-save-eq",handleSaveEq);
+  on("btn-delete-eq",handleDeleteEq);
+  document.querySelector(".overlay")?.addEventListener("click",function(e){if(e.target===this){STATE.modal=null;render();}});
+  document.getElementById("inp-password")?.addEventListener("keydown",e=>{if(e.key==="Enter")handleLogin();});
+
+  // Wire cal status toggle
+  const calSel=document.getElementById("inp-cal-status");
+  if(calSel)calSel.addEventListener("change",()=>toggleCalDates(calSel.value));
+
+  // Render QR code if qr modal is open
+  if(STATE.modal==="qrCode"&&STATE.qrItem){
+    const qrWrap=document.getElementById("qr-code-output");
+    if(qrWrap&&typeof QRCode!=="undefined"){
+      qrWrap.innerHTML="";
+      const qrData=JSON.stringify({
+        id:STATE.qrItem.id,name:STATE.qrItem.name,
+        serial:STATE.qrItem.serial_number,location:STATE.qrItem.location,
+        status:STATE.qrItem.status,nextMaint:STATE.qrItem.next_maintenance
+      });
+      new QRCode(qrWrap,{
+        text:qrData,width:200,height:200,
+        colorDark:"#1e293b",colorLight:"#ffffff",
+        correctLevel:QRCode.CorrectLevel.H
+      });
+    } else if(qrWrap&&typeof QRCode==="undefined"){
+      qrWrap.innerHTML='<div style="width:200px;height:200px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:8px;font-size:13px;color:var(--sub);flex-direction:column;gap:8px"><span style="font-size:32px">📱</span><span>QR library loading…</span></div>';
+    }
+    // Wire print + download buttons
+    on("btn-print-qr",()=>{
+      // Extract QR as a data URL from the canvas — never inject raw innerHTML
+      // into a new window (avoids XSS via DOM manipulation or browser extensions)
+      const canvas=document.getElementById("qr-canvas-wrap")?.querySelector("canvas");
+      if(!canvas){showToast("QR not ready — try again in a moment","error");return;}
+      const dataUrl=canvas.toDataURL("image/png");
+      const win=window.open("","_blank");
+      if(!win){showToast("Pop-up blocked — allow pop-ups for this site","error");return;}
+      // All content is either escaped text or a safe data: URI — no raw HTML injection
+      win.document.write(
+        '<!DOCTYPE html><html><head><title>QR \u2014 '+esc(STATE.qrItem.name)+'</title>'+
+        '<style>body{font-family:sans-serif;text-align:center;padding:40px}h2{margin-bottom:4px}p{color:#64748b;font-size:13px}img{display:block;margin:16px auto}</style>'+
+        '</head><body>'+
+        '<h2>'+esc(STATE.qrItem.name)+'</h2>'+
+        '<p>SN: '+esc(STATE.qrItem.serial_number)+' | '+esc(STATE.qrItem.location)+'</p>'+
+        '<img src="'+dataUrl+'" alt="QR code" width="200" height="200"/>'+
+        '<p style="margin-top:12px">Next Maintenance: '+esc(STATE.qrItem.next_maintenance)+'</p>'+
+        '<script>window.print();window.close();<\/script>'+
+        '</body></html>');
+      win.document.close();
+    });
+    on("btn-download-qr",()=>{
+      const canvas=document.getElementById("qr-code-output")?.querySelector("canvas");
+      if(!canvas){showToast("QR not ready — try again in a moment","error");return;}
+      const a=document.createElement("a");
+      a.href=canvas.toDataURL("image/png");
+      a.download="QR-"+san.serial(STATE.qrItem.serial_number||"equip")+".png";
+      a.click();
+      showToast("QR code saved ✓","success");
+    });
+  }
+}
+
+async function handleLogin(){
+  const email=san.email(document.getElementById("inp-email")?.value||"");
+  const pass=san.text(document.getElementById("inp-password")?.value||"");
+  const errEl=document.getElementById("login-error");
+  const btn=document.getElementById("btn-do-login");
+  if(errEl)errEl.style.display="none";
+  const preCheck=checkRate();
+  if(!preCheck.ok){
+    if(errEl){errEl.textContent=preCheck.msg;errEl.style.display="block";}
+    if(btn){btn.disabled=true;let t=preCheck.wait;const cd=setInterval(()=>{if(t<=0){clearInterval(cd);btn.disabled=false;btn.textContent="Login";return;}btn.textContent="Wait "+t+"s…";t--;},1000);}
+    return;
+  }
+  if(btn){btn.disabled=true;btn.textContent="Verifying…";}
+  const res=await doLogin(email,pass);
+  if(res.ok){
+    STATE.modal=null;
+    // Verify role from DB — never trust client-side state alone
+    if(!STATE.offline){
+      try{
+        // get_my_role() RPC returns a scalar string e.g. "admin"
+        const rr=await sb.getMyRole(STATE.adminEmail);
+        // RPC scalar comes back as raw string or {"get_my_role":"admin"}
+        let dbRole="viewer";
+        if(typeof rr==="string")dbRole=rr;
+        else if(rr&&typeof rr==="object"&&rr.get_my_role)dbRole=rr.get_my_role;
+        // Validate the role is a known value
+        if(!["admin","engineer","technician","viewer"].includes(dbRole))dbRole="viewer";
+        STATE.verifiedRole=dbRole;
+        saveS("medinv_role",dbRole);
+        const roleEmoji={admin:"🔴",engineer:"🔵",technician:"🟡",viewer:"🟢"}[dbRole]||"⚪";
+        showToast("Welcome "+esc(STATE.adminEmail)+" "+roleEmoji+" "+dbRole+" ✓","success");
+      }catch(e){
+        // If role fetch fails, default to viewer (fail-safe)
+        STATE.verifiedRole="viewer";saveS("medinv_role","viewer");
+        showToast("Logged in — could not verify role (defaulting to viewer)","error");
+        console.warn("Role fetch failed:",e.message);
+      }
+    } else {
+      // Demo/offline mode — admin only for testing
+      STATE.verifiedRole="admin";saveS("medinv_role","admin");
+      showToast("Welcome "+esc(STATE.adminEmail)+" [Demo] ✓","success");
+    }
+    render();
+  }
+  else{recordLoginFailure();if(errEl){errEl.textContent=res.msg;errEl.style.display="block";}if(btn){btn.disabled=false;btn.textContent="Login";}}
+}
+
+async function handleSaveEq(){
+  if(!canEdit()){showToast("Admin or Engineer role required","error");return;}
+  function showFE(id,msg){const el=document.getElementById(id);if(el)el.classList.add("err");const e=document.getElementById("err-"+id);if(e){e.textContent=msg;e.style.display="block";}}
+  function clearFE(){document.querySelectorAll(".inp.err").forEach(el=>el.classList.remove("err"));document.querySelectorAll(".field-err").forEach(el=>{el.style.display="none";el.textContent="";});}
+  clearFE();
+  const name   =san.name(document.getElementById("inp-name")?.value||"");
+  const serial =san.serial(document.getElementById("inp-serial")?.value||"");
+  const maint  =san.date(document.getElementById("inp-maint")?.value||"");
+  const rawCat =san.text(document.getElementById("inp-category")?.value||"");
+  const rawLoc =san.text(document.getElementById("inp-location")?.value||"");
+  const rawStat=san.text(document.getElementById("inp-status")?.value||"");
+  const calStatVal=san.text(document.getElementById("inp-cal-status")?.value||"cal_not_required");
+  const lastCal=san.date(document.getElementById("inp-last-cal")?.value||"")||null;
+  const nextCal=san.date(document.getElementById("inp-next-cal")?.value||"")||null;
+  const _rawMaint=san.num(document.getElementById("inp-maint-interval")?.value||DEFAULT_RECURRENCE);
+  const maintInterval=(_rawMaint>0?_rawMaint:parseInt(DEFAULT_RECURRENCE)).toString();
+  const _rawCal=san.num(document.getElementById("inp-cal-interval")?.value||DEFAULT_CAL_RECURRENCE);
+  const calInterval=(_rawCal>0?_rawCal:parseInt(DEFAULT_CAL_RECURRENCE)).toString();
+  const notes  =san.notes(document.getElementById("inp-notes")?.value||"");
+  let ok=true;
+  if(!V.name(name))                  {showFE("inp-name","Name must be 2–120 characters.");ok=false;}
+  if(!V.serial(serial))              {showFE("inp-serial","Use 1–60 alphanumeric / - _ . / chars.");ok=false;}
+  if(!V.date(maint))                 {showFE("inp-maint","Select a valid date (YYYY-MM-DD).");ok=false;}
+  if(!V.status(rawStat))             {showFE("inp-status","Invalid functional status.");ok=false;}
+  if(!V.calStatus(calStatVal))       {showFE("inp-cal-status","Invalid calibration status.");ok=false;}
+  if(!getCategories().includes(rawCat)){showFE("inp-category","Select a valid category.");ok=false;}
+  if(!getLocations().includes(rawLoc)) {showFE("inp-location","Select a valid location.");ok=false;}
+  if(calStatVal==="cal_required"){
+    if(lastCal&&!V.date(lastCal))    {showFE("inp-last-cal","Enter a valid date (YYYY-MM-DD).");ok=false;}
+    if(!nextCal)                     {showFE("inp-next-cal","Next Calibration Date is required.");ok=false;}
+    else if(!V.date(nextCal))        {showFE("inp-next-cal","Enter a valid date (YYYY-MM-DD).");ok=false;}
+  }
+  if(!ok)return;
+  const isEdit=STATE.modal&&STATE.modal!=="add";
+  const item={id:isEdit?STATE.modal.id:uid(),name,category:rawCat,serial_number:serial,location:rawLoc,status:rawStat,next_maintenance:maint,calibration_status:calStatVal,last_calibration:calStatVal==="cal_required"?lastCal:null,next_calibration:calStatVal==="cal_required"?nextCal:null,maintenance_interval:maintInterval,calibration_interval:calStatVal==="cal_required"?calInterval:null,notes,last_updated:today(),...(isEdit?{}:{_isNew:true})};
+  const btn=document.getElementById("btn-save-eq");
+  if(btn){btn.disabled=true;btn.textContent="Saving…";}
+  try{await persistEquipment(item);STATE.modal=null;await fetchEquipment();showToast(isEdit?"Equipment updated ✓":"Equipment added ✓","success");}
+  catch{
+    if(btn){btn.disabled=false;btn.textContent="💾 "+(isEdit?"Update":"Add")+" Equipment";}
+    const sb2=document.getElementById("btn-save-eq");
+    if(sb2)delete sb2.dataset.submitting;
+  }
+}
+
+async function handleDeleteEq(){
+  if(!isAdmin()){showToast("Admin role required to delete","error");return;}
+  if(STATE.modal==="add"||!STATE.modal)return;
+  if(!confirm("Delete \""+san.text(STATE.modal.name)+"\"? This cannot be undone."))return;
+  try{await removeEquipment(STATE.modal.id);STATE.modal=null;render();showToast("Equipment deleted","info");}catch{}
+}
+
+/* ═══════════════════════════════════════════════════════
+   14b. SERVICE HISTORY
+═══════════════════════════════════════════════════════ */
+async function loadServiceHistory(equipId){
+  STATE.historyItem=STATE.equipment.find(e=>e.id===equipId)||STATE.detail;
+  STATE.historyLogs=[];
+  STATE.modal="serviceHistory";
+  STATE.detail=null;
+  render();
+  if(!STATE.offline){
+    try{
+      const logs=await sb.query("audit_log",
+        "record_id=eq."+encodeURIComponent(equipId)+"&order=changed_at.desc&limit=100");
+      if(Array.isArray(logs)){
+        STATE.historyLogs=logs;
+        render();
+      }
+    }catch(e){showToast("Could not load history: "+e.message,"error");}
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   15. TOAST
+═══════════════════════════════════════════════════════ */
+function showToast(msg,type){
+  document.querySelectorAll(".toast").forEach(t=>t.remove());
+  const BG={success:"#dcfce7",error:"#fee2e2",info:"#1e293b"};
+  const TC={success:"#166534",error:"#991b1b",info:"#fff"};
+  const t=document.createElement("div");
+  t.className="toast";t.setAttribute("role","status");t.setAttribute("aria-live","polite");
+  t.style.cssText="position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:"+(BG[type]||BG.info)+";color:"+(TC[type]||TC.info)+";font-family:Nunito,sans-serif;font-weight:700;font-size:13px;padding:11px 22px;border-radius:99px;z-index:999;max-width:320px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.18);pointer-events:none;border:"+(type!=="info"?"1.5px solid "+(TC[type]||""):"none")+";animation:fadeIn .2s ease";
+  t.textContent=String(msg||"").slice(0,200);
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300);},2800);
+}
+
+/* ═══════════════════════════════════════════════════════
+   16. BOOT
+═══════════════════════════════════════════════════════ */
+// Safety check: warn if service_role key accidentally used
+// service_role JWTs contain "role":"service_role" in their payload
+(()=>{
+  try{
+    if(!SUPABASE_ANON.includes("YOUR_ANON")&&SUPABASE_ANON.includes(".")){
+      const payload=JSON.parse(atob(SUPABASE_ANON.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+      if(payload.role==="service_role"){
+        document.body.innerHTML='<div style="font-family:Nunito,sans-serif;padding:40px;max-width:500px;margin:0 auto;text-align:center"><div style="font-size:48px;margin-bottom:16px">🚨</div><h1 style="color:#ef4444;font-size:22px;margin-bottom:12px">SECURITY ERROR</h1><p style="color:#1e293b;font-size:15px;line-height:1.6">You have used the <strong>service_role</strong> key instead of the <strong>anon/public</strong> key. This bypasses all Row Level Security and exposes your entire database.<br/><br/>Replace SUPABASE_ANON with your <strong>anon public key</strong> from Supabase → Settings → API.</p></div>';
+        throw new Error("CRITICAL: service_role key detected in frontend — app halted");
+      }
+    }
+  }catch(e){if(e.message.includes("CRITICAL"))throw e;/* ignore decode errors */}
+})();
+
+if(SUPABASE_URL.includes("YOUR_PROJECT")||SUPABASE_ANON.includes("YOUR_ANON")){
+  STATE.offline=true;STATE.loading=false;
+  STATE.equipment=JSON.parse(JSON.stringify(SEED));
+  render();
+  // Show pending queue count on load
+  const pq=loadP(QUEUE_KEY,[]);
+  if(pq.length)showSyncBanner(pq.length);
+}else{
+  render();
+  loadSettingsFromDB().then(()=>{
+    render();
+    fetchEquipment().then(()=>{
+      startRealtime(); // tries Realtime WS first, falls back to polling
+      // Flush any writes that were queued offline
+      const pq=loadP(QUEUE_KEY,[]);
+      if(pq.length){showToast("Flushing "+pq.length+" offline change(s)…","info");flushQueue();}
+    });
+  });
+}
+
+// Auto-logout on JWT expiry
+setInterval(()=>{
+  if(STATE.adminSession?.expires_at&&Date.now()/1000>STATE.adminSession.expires_at-60){
+    doLogout();showToast("Session expired — please log in again.","error");render();
+  }
+},60000);
+</script>
+</body>
+</html>
